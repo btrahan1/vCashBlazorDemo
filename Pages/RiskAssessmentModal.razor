@@ -1,0 +1,242 @@
+@using vCashBlazorDemo.Services
+@using vCash.Data.Models
+@inject RiskService RiskService
+@inject NotificationService NotificationService
+@inject ImageGenerationService ImageGenerationService
+
+
+@if (IsVisible)
+{
+    <div class="modal fade show d-block" style="background-color: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <!-- Header -->
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Risk Assessment Required
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body">
+                    <!-- Reasons -->
+                    <div class="alert alert-danger mb-4">
+                        <h6 class="fw-bold"><i class="bi bi-shield-exclamation me-2"></i>Risk Indicators:</h6>
+                        <ul class="mb-0">
+                            @foreach (var reason in RiskResult.Reason.Split('.', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                <li>@reason.Trim()</li>
+                            }
+                        </ul>
+                    </div>
+
+                    <!-- Contact Info Context -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title fw-bold text-muted">Maker Contact</h6>
+                                    <p class="mb-1 fw-bold">@Maker?.Name</p>
+                                    <p class="mb-0">Phone: Unknown (Placeholder)</p>  <!-- TODO: Add Phone to Maker Model -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title fw-bold text-muted">Bank Contact</h6>
+                                    <p class="mb-1 fw-bold">@Bank?.CustomerName</p>
+                                    <p class="mb-0">Phone: @Bank?.PhoneNumber</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Verification Steps -->
+                    <h6 class="fw-bold mb-3 border-bottom pb-2">Verification Checklist</h6>
+                    
+                    <div class="d-flex flex-column gap-3">
+                        @if (RiskResult.CallMaker)
+                        {
+                            <div class="form-check p-3 border rounded @(MakerVerified ? "bg-success-subtle border-success" : "bg-light")">
+                                <input class="form-check-input fs-5" type="checkbox" id="checkMaker" @bind="MakerVerified">
+                                <label class="form-check-label fs-5 ms-2" for="checkMaker">
+                                    <strong>Call Maker:</strong> Verified issuance with account holder.
+                                </label>
+                            </div>
+                        }
+
+                        @if (RiskResult.CallBank)
+                        {
+                            <div class="form-check p-3 border rounded @(BankVerified ? "bg-success-subtle border-success" : "bg-light")">
+                                <input class="form-check-input fs-5" type="checkbox" id="checkBank" @bind="BankVerified">
+                                <label class="form-check-label fs-5 ms-2" for="checkBank">
+                                    <strong>Call Bank:</strong> Verified funds available.
+                                </label>
+                            </div>
+                        }
+
+                        @if (RiskResult.CallCorporate)
+                        {
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning-subtle fw-bold">
+                                    <i class="bi bi-building me-2"></i>Corporate Approval Required
+                                </div>
+                                <div class="card-body">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-6 text-center border-end">
+                                            <small class="text-muted d-block text-uppercase">Generated Code</small>
+                                            <span class="display-6 fw-bold text-primary">@RiskResult.GeneratedCode</span>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Enter Corporate Code:</label>
+                                            <input type="text" class="form-control form-control-lg text-center fw-bold @(IsCodeValid ? "is-valid" : "")" 
+                                                   placeholder="Wait for Approval..." 
+                                                   @bind="EnteredCode" 
+                                                   @bind:event="oninput"
+                                                   @onkeyup="ValidateCode"
+                                                   disabled="@(!ArePrerequisitesMet)" />
+                                            <small class="text-muted d-block mt-1">
+                                                (Test Hint: Code is <strong>@RiskResult.ExpectedAnswer</strong>)
+                                            </small>
+                                            @if (!ArePrerequisitesMet)
+                                            {
+                                                <small class="text-danger mt-1 d-block"><i class="bi bi-lock me-1"></i>Verify Maker/Bank first.</small>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="d-flex justify-content-end mt-2">
+                             <button class="btn btn-outline-primary btn-sm" @onclick="SendRiskAlert" disabled="@IsSendingAlert">
+                                <i class="bi bi-chat-left-text me-2"></i> 
+                                @(IsSendingAlert ? "Sending..." : "Send Data to Manager")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary btn-lg" @onclick="Close">
+                        Decline Transaction
+                    </button>
+                    <button type="button" class="btn btn-success btn-lg px-5 fw-bold" @onclick="Approve" disabled="@(!CanApprove)">
+                        <i class="bi bi-check-lg me-2"></i> Approve
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<bool> OnResolving { get; set; }
+
+    private bool IsVisible { get; set; }
+    private RiskResult RiskResult { get; set; } = new();
+    private Maker? Maker { get; set; }
+    private Bank? Bank { get; set; }
+    // Scan Details needed for Image Gen
+    private string Routing { get; set; }
+    private string Account { get; set; }
+    private string CheckNum { get; set; }
+
+    private bool MakerVerified { get; set; }
+    private bool BankVerified { get; set; }
+    private string EnteredCode { get; set; } = "";
+    private bool IsCodeValid { get; set; }
+
+    public void Show(RiskResult result, Maker? maker, Bank? bank, string rt, string acct, string chk)
+    {
+        RiskResult = result;
+        Maker = maker;
+        Bank = bank;
+        Routing = rt;
+        Account = acct;
+        CheckNum = chk;
+        
+        // Reset State
+        MakerVerified = !result.CallMaker; // If not required, auto-verify
+        BankVerified = !result.CallBank;
+        EnteredCode = "";
+        IsCodeValid = !result.CallCorporate;
+        
+        IsVisible = true;
+        StateHasChanged();
+    }
+
+    private void ValidateCode()
+    {
+        if (!RiskResult.CallCorporate) return;
+        
+        // Check Corporate Code against Service logic
+        string expected = RiskService.CalculateExpectedCode(RiskResult.GeneratedCode);
+        if (EnteredCode.Trim().ToUpper() == expected)
+        {
+            IsCodeValid = true;
+        }
+        else
+        {
+            IsCodeValid = false;
+        }
+    }
+
+    private bool ArePrerequisitesMet => MakerVerified && BankVerified;
+
+    private bool CanApprove
+    {
+        get
+        {
+            if (RiskResult.CallCorporate)
+            {
+                return ArePrerequisitesMet && IsCodeValid;
+            }
+            return ArePrerequisitesMet;
+        }
+    }
+
+    private async Task Approve()
+    {
+        IsVisible = false;
+        await OnResolving.InvokeAsync(true);
+    }
+
+    private async Task Close()
+    {
+        IsVisible = false;
+        await OnResolving.InvokeAsync(false);
+    }
+    
+    private bool IsSendingAlert = false;
+    private async Task SendRiskAlert()
+    {
+        IsSendingAlert = true;
+        await InvokeAsync(StateHasChanged);
+        
+        try
+        {
+            // NEW: Generate Dynamic Check Image
+            var makerName = Maker?.Name ?? "Unknown Maker";
+            var imgPath = ImageGenerationService.GenerateCheckImage(makerName, RiskResult.Amount, Routing, Account, CheckNum);
+            
+            string body = $"Risk Alert!\nMaker: {makerName}\nAmount: {RiskResult.Amount:C}\nReasons: {RiskResult.Reason}";
+            
+            // Hardcoded recipient for valid test
+            // We rename the attachment to .jpg to ensure MMS compatibility on phones
+            await NotificationService.SendMmsAsync("9012978112@tmomail.net", "vCash Alert", body, imgPath, "Check_Scan.jpg");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"MMS Error: {ex.Message}");
+        }
+        finally
+        {
+            IsSendingAlert = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,201 @@
+@inject IJSRuntime JS
+@using vCashBlazorDemo.Models
+@using vCash.Data.Models
+
+@if (ShowDialog)
+{
+    <div class="modal show" tabindex="-1" style="display: block !important; background-color: rgba(0,0,0,0.5); z-index: 10000;">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-upc-scan me-2"></i>Digital Check Scanner</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <!-- Left: Controls -->
+                        <div class="col-md-4 d-flex flex-column gap-3">
+                            <div class="card bg-light border-0">
+                                <div class="card-body">
+                                    <label class="form-label fw-bold small text-muted">Check Date</label>
+                                    <input type="text" class="form-control mb-2" value="@DateTime.Now.ToShortDateString()" readonly />
+                                    
+                                    <label class="form-label fw-bold small text-muted">Detected Amount</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="text" class="form-control fw-bold fs-5 text-end" value="@ScannedResult?.Amount.ToString("0.00")" readonly />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary py-2" @onclick="StartScan" disabled="@IsScanning">
+                                    @if(IsScanning) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                                    <i class="bi bi-printer me-2"></i> Begin Scan
+                                </button>
+                                
+                                <button class="btn btn-success py-2 fw-bold" @onclick="AcceptScan" disabled="@(ScannedResult == null)">
+                                    <i class="bi bi-check-lg me-2"></i> Accept Check
+                                </button>
+                                
+                                <button class="btn btn-outline-secondary" @onclick="Close">
+                                    Cancel
+                                </button>
+                            </div>
+
+                            @if(ProcessLog.Any())
+                            {
+                                <div class="mt-auto border rounded bg-white p-2 small font-monospace text-muted" style="height: 100px; overflow-y: auto;">
+                                    @foreach(var log in ProcessLog)
+                                    {
+                                        <div class="text-nowrap">@log</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Right: Image View -->
+                        <div class="col-md-8">
+                            <div class="border rounded bg-dark d-flex align-items-center justify-content-center position-relative overflow-hidden" 
+                                 style="height: 400px; background-image: radial-gradient(#333 1px, #212529 1px); background-size: 20px 20px;">
+                                
+                                @if (IsScanning)
+                                {
+                                    <div class="text-center text-info">
+                                        <div class="spinner-border mb-3" style="width: 3rem; height: 3rem;"></div>
+                                        <div class="fs-5 animate-pulse">Initializing Scanner Hardware...</div>
+                                    </div>
+                                }
+                                else if (ScannedResult != null)
+                                {
+                                    <!-- Using the existing placeholder image logic or a generated one -->
+                                    <!-- For now, we reuse the generic one or a placeholder if I haven't generated a specific 'check' image yet. 
+                                         I'll generate a check image in a moment. For now, use a nice CSS placeholder logic -->
+                                     <div class="bg-white p-3 shadow-sm transform-rotate-1" style="width: 90%; height: 40%;">
+                                         <div class="border-bottom pb-2 mb-2 d-flex justify-content-between">
+                                             <span class="font-monospace small">Pay to the Order of</span>
+                                             <span class="font-monospace fw-bold">$@ScannedResult?.Amount.ToString("0.00")</span>
+                                         </div>
+                                         <div class="font-cursive fs-4 text-center my-3">@(ScannedResult?.MakerName ?? "Authorized Payee")</div>
+                                         <div class="border-top pt-2 d-flex justify-content-between small text-muted font-monospace">
+                                             <span>⑆@ScannedResult?.RoutingNumber⑆</span>
+                                             <span>@ScannedResult?.AccountNumber⑈</span>
+                                              <span>@ScannedResult?.CheckNumber</span>
+                                         </div>
+                                     </div>
+                                 }
+                                else
+                                {
+                                    <div class="text-white-50 text-center">
+                                        <i class="bi bi-arrow-left-circle fs-1 mb-2"></i>
+                                        <div>Ready to Scan</div>
+                                        <small>Place check in feeder and press Begin</small>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .font-cursive { font-family: 'Brush Script MT', cursive; }
+</style>
+
+@code {
+    public bool ShowDialog { get; set; }
+    
+    [Parameter]
+    public EventCallback<CheckScanResult> OnCheckAccepted { get; set; }
+
+    [Parameter]
+    public IEnumerable<Maker> AvailableMakers { get; set; } = new List<Maker>();
+
+    private CheckScanResult? ScannedResult;
+    private bool IsScanning;
+    private List<string> ProcessLog = new();
+
+    public void Show()
+    {
+        ShowDialog = true;
+        ScannedResult = null;
+        IsScanning = false;
+        ProcessLog.Clear();
+        ProcessLog.Add("Scanner Ready.");
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        ShowDialog = false;
+        StateHasChanged();
+    }
+
+    private async Task StartScan()
+    {
+        IsScanning = true;
+        ProcessLog.Add("Initializing Transport...");
+        StateHasChanged();
+        
+        await Task.Delay(1000); 
+        ProcessLog.Add("Capturing Image...");
+        StateHasChanged();
+        
+        await Task.Delay(800);
+        
+        // Generate Realistic Data
+        var rnd = new Random();
+        var amount = (decimal)rnd.Next(50, 4800) + (decimal)rnd.NextDouble(); // Up to 4800 to trigger risk
+        
+        string rt, acct, name;
+        
+        if (AvailableMakers != null && AvailableMakers.Any())
+        {
+             var makerList = AvailableMakers.ToList();
+             var maker = makerList[rnd.Next(makerList.Count)];
+             rt = maker.RoutingNumber;
+             acct = maker.AccountNumber;
+             name = maker.Name;
+        }
+        else
+        {
+             // Fallback if no db makers
+             rt = "123456789";
+             acct = "1001001";
+             name = "Unknown Details";
+        }
+
+        var checkNum = rnd.Next(1001, 9999).ToString();
+
+        ScannedResult = new CheckScanResult
+        {
+            Amount = Math.Round(amount, 2),
+            RoutingNumber = rt,
+            AccountNumber = acct,
+            CheckNumber = checkNum,
+            MakerName = name
+        };
+        
+        ProcessLog.Add($"MICR Read: ⑆{rt}⑆ {acct}⑈");
+        
+        await Task.Delay(500);
+        ProcessLog.Add("OCR Processing...");
+        ProcessLog.Add($"Confidence: 98.5%");
+        ProcessLog.Add($"Amount Detected: {ScannedResult.Amount:C}");
+        
+        IsScanning = false;
+        StateHasChanged();
+    }
+
+    private async Task AcceptScan()
+    {
+        if (ScannedResult != null && OnCheckAccepted.HasDelegate)
+        {
+            await OnCheckAccepted.InvokeAsync(ScannedResult);
+        }
+        Close();
+    }
+}

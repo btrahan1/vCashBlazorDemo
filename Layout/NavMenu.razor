@@ -1,0 +1,56 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand text-truncate" href="">
+            <i class="bi bi-wallet2 me-2"></i>vCash<span class="fw-light ms-1">Blazor</span>
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/transaction">
+                <span class="me-3 fs-5" aria-hidden="true">💵</span> Transactions
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/reports">
+                <span class="me-3 fs-5" aria-hidden="true">📄</span> Reports
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/transfers">
+                <span class="me-3 fs-5" aria-hidden="true">🚚</span> Transfers
+            </NavLink>
+        </div>
+
+         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/maintenance">
+                <span class="me-3 fs-5" aria-hidden="true">🛠️</span> Maintenance
+            </NavLink>
+        </div>
+        
+         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/audit">
+                <span class="me-3 fs-5" aria-hidden="true">📋</span> Audit
+            </NavLink>
+        </div>
+
+         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/help">
+                <span class="me-3 fs-5" aria-hidden="true">🛟</span> Help
+            </NavLink>
+        </div>
+
+         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="vcash/logout">
+                <span class="bi bi-box-arrow-right me-2" aria-hidden="true"></span> Log Out
+            </NavLink>
+        </div>
+    </nav>
+</div>
+

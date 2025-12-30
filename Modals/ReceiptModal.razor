@@ -1,0 +1,158 @@
+@inject IJSRuntime JS
+@using vCashBlazorDemo.Models
+
+@if (ShowDialog)
+{
+    <div class="modal show" tabindex="-1" style="display: block !important; background-color: rgba(0,0,0,0.5); z-index: 10000;">
+        <div class="modal-dialog modal-dialog-centered modal-sm"> <!-- Small width for receipt look -->
+            <div class="modal-content shadow-lg border-0 rounded-0">
+                <div class="modal-body p-0">
+                    
+                    <!-- Thermal Receipt Paper Effect -->
+                    <div class="bg-white p-3 font-monospace position-relative" style="box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        
+                        <!-- Header -->
+                        <div class="text-center mb-3">
+                            <i class="bi bi-bank fs-1"></i>
+                            <h5 class="fw-bold mb-0">vCash Express</h5>
+                            <small class="text-muted">Store #4482 - Downtown</small>
+                            <div class="small text-muted">@DateTime.Now.ToString("g")</div>
+                        </div>
+
+                        <hr class="border-top border-dark border-2 border-dashed my-2" />
+
+                        <!-- Line Items -->
+                        <div class="mb-3 small">
+                            @foreach (var item in Items)
+                            {
+                                <div class="d-flex justify-content-between mb-1 @(item.IsVoid ? "text-decoration-line-through text-muted" : "")">
+                                    <span class="text-truncate" style="max-width: 140px;">@item.Type</span>
+                                    <span>@item.Amount.ToString("N2")</span>
+                                </div>
+                            }
+                        </div>
+
+                        <hr class="border-top border-dark border-2 border-dashed my-2" />
+
+                        <!-- Totals -->
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>Total Fees:</span>
+                                <span>@TotalFees.ToString("N2")</span>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span>Cash In:</span>
+                                <span>@TotalCashIn.ToString("N2")</span>
+                            </div>
+                             <div class="d-flex justify-content-between small">
+                                <span>Cash Out:</span>
+                                <span>@TotalCashOut.ToString("N2")</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between fw-bold fs-5 mt-2 border-top border-dark pt-2">
+                            <span>PAYOUT:</span>
+                            <span>@NetPayout.ToString("C")</span>
+                        </div>
+
+                        <!-- Payout Details -->
+                        <div class="mt-3 pt-2 border-top border-dashed small">
+                            <div class="fw-bold mb-1 text-uppercase text-decoration-underline">Dispensed Cash</div>
+                            @if(DispensedBills != null)
+                            {
+                                @foreach(var bill in DispensedBills.OrderByDescending(x => x.Key))
+                                {
+                                    if(bill.Value > 0)
+                                    {
+                                        <div class="d-flex justify-content-between text-muted">
+                                            <span>$@bill.Key bills (x @bill.Value)</span>
+                                            <span>@((bill.Key * bill.Value).ToString("N2"))</span>
+                                        </div>
+                                    }
+                                }
+                            }
+                            @if(Change > 0)
+                            {
+                                <div class="d-flex justify-content-between text-dark fw-bold mt-1">
+                                    <span>Change (Drawer):</span>
+                                    <span>@Change.ToString("N2")</span>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="text-center mt-4 mb-2">
+                            <i class="bi bi-upc-scan fs-1"></i>
+                            <div class="small">THANK YOU</div>
+                        </div>
+                        
+                        <!-- Tear Effect (Visual CSS) -->
+                        <div class="position-absolute start-0 w-100" style="bottom: -10px; height: 10px; background: radial-gradient(circle, transparent 70%, #fff 75%) 0 0/10px 10px repeat-x;"></div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="bg-light p-2 d-flex gap-2">
+                        <button class="btn btn-primary w-100" @onclick="Print">
+                            <i class="bi bi-printer"></i> Print
+                        </button>
+                        <button class="btn btn-secondary w-100" @onclick="Close">
+                            Close
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public bool ShowDialog { get; set; }
+    
+    [Parameter]
+    public IEnumerable<TransactionModel> Items { get; set; } = new List<TransactionModel>();
+    
+    [Parameter]
+    public decimal TotalFees { get; set; }
+    
+    [Parameter]
+    public decimal TotalCashIn { get; set; }
+    
+    [Parameter]
+    public decimal TotalCashOut { get; set; }
+
+    [Parameter]
+    public decimal NetPayout { get; set; }
+
+    [Parameter]
+    public Dictionary<int, int> DispensedBills { get; set; } = new();
+
+    [Parameter]
+    public decimal Change { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    public void Show()
+    {
+        ShowDialog = true;
+        StateHasChanged();
+    }
+
+    public async Task Close()
+    {
+        ShowDialog = false;
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+        StateHasChanged();
+    }
+
+    private async Task Print()
+    {
+        // Mock Print
+        await JS.InvokeVoidAsync("alert", "Printing Receipt to Local Printer...");
+        await Close();
+    }
+}

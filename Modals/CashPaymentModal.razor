@@ -1,0 +1,108 @@
+@using vCash.Data.Models
+
+<div class="modal fade @(_isVisible ? "show" : "")" id="cashPaymentModal" tabindex="-1" style="display: @(_isVisible ? "block" : "none");" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cash-coin me-2"></i>Cash Payment</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info py-2 d-flex justify-content-between align-items-center fw-bold">
+                    <span>Amount Due:</span>
+                    <span class="fs-4">@AmountDue.ToString("C")</span>
+                </div>
+
+                <div class="row g-2">
+                    <!-- Bill Inputs -->
+                    <div class="col-6">
+                        <label class="small fw-bold">Hundreds ($100)</label>
+                        <input type="number" class="form-control text-end fw-bold" @bind="Counts.Hundreds" @bind:after="Calculate" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">Fifties ($50)</label>
+                        <input type="number" class="form-control text-end fw-bold" @bind="Counts.Fifties" @bind:after="Calculate" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">Twenties ($20)</label>
+                        <input type="number" class="form-control text-end fw-bold" @bind="Counts.Twenties" @bind:after="Calculate" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">Tens ($10)</label>
+                        <input type="number" class="form-control text-end fw-bold" @bind="Counts.Tens" @bind:after="Calculate" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">Fives ($5)</label>
+                        <input type="number" class="form-control text-end fw-bold" @bind="Counts.Fives" @bind:after="Calculate" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">Ones ($1)</label>
+                        <input type="number" class="form-control text-end fw-bold" @bind="Counts.Ones" @bind:after="Calculate" min="0" />
+                    </div>
+                </div>
+
+                <div class="border-top mt-3 pt-2">
+                    <div class="d-flex justify-content-between fs-5">
+                        <span class="text-muted">Paid In:</span>
+                        <span class="fw-bold">@TotalPaidIn.ToString("C")</span>
+                    </div>
+                    <div class="d-flex justify-content-between fs-5 mt-1">
+                        <span class="text-muted">Change:</span>
+                        <span class="fw-bold @(Change >= 0 ? "text-success" : "text-danger")">@Change.ToString("C")</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
+                <button type="button" class="btn btn-success fw-bold px-4" @onclick="ConfirmPay" disabled="@(Change < 0)">
+                    <i class="bi bi-check-circle me-1"></i> PAY & DISPENSE
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_isVisible)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private bool _isVisible = false;
+    private decimal AmountDue;
+    private BillCounts Counts = new BillCounts();
+
+    [Parameter] public EventCallback<BillCounts> OnPaymentConfirmed { get; set; }
+
+    public void Show(decimal amountDue)
+    {
+        AmountDue = amountDue;
+        Counts = new BillCounts(); // Reset
+        Calculate();
+        _isVisible = true;
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+
+    private decimal TotalPaidIn => Counts.Total;
+    private decimal Change => TotalPaidIn - AmountDue;
+
+    private void Calculate()
+    {
+        StateHasChanged();
+    }
+
+    private async Task ConfirmPay()
+    {
+        if (Change >= 0)
+        {
+            _isVisible = false;
+            await OnPaymentConfirmed.InvokeAsync(Counts);
+        }
+    }
+}

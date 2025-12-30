@@ -1,0 +1,180 @@
+@page "/vcash/audit"
+@inject IJSRuntime JS
+
+<PageTitle>vCash Audit</PageTitle>
+
+<div class="container-fluid vcash-layout h-100 d-flex flex-column p-0">
+    
+    <!-- Top Toolbar -->
+    <div class="bg-white border-bottom px-3 py-2 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-3">
+            <h5 class="fw-bold mb-0 text-secondary"><i class="bi bi-journal-check me-2"></i>Audit Center</h5>
+            
+            <div class="d-flex align-items-center gap-2 border-start ps-3">
+                <label class="small fw-bold text-muted">Business Date:</label>
+                <input type="date" class="form-control form-control-sm" value="@DateTime.Today.ToString("yyyy-MM-dd")" style="width: 150px;" />
+            </div>
+        </div>
+        
+        <div>
+             <button class="btn btn-success btn-sm fw-bold" @onclick="ExportExcel">
+                <i class="bi bi-file-earmark-excel me-1"></i> Export To Excel
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area (Tabs + Grid + Filter) -->
+    <div class="flex-grow-1 d-flex overflow-hidden">
+        
+        <!-- Left: Tabs & Grid -->
+        <div class="flex-grow-1 d-flex flex-column bg-light p-3">
+            
+            <!-- Tabs -->
+            <ul class="nav nav-pills mb-3 gap-1">
+                @RenderTab("Checks", true)
+                @RenderTab("Transactions")
+                @RenderTab("Tran Detail")
+                @RenderTab("Cash Drawer")
+                @RenderTab("Drawer Counts")
+                @RenderTab("Dispenser")
+                @RenderTab("Cash Position")
+                @RenderTab("Balance")
+                @RenderTab("Log Files")
+            </ul>
+
+            <!-- Data Grid Container -->
+            <div class="card flex-grow-1 shadow-sm border-0 overflow-hidden">
+                <div class="card-header bg-secondary text-white py-1 small fw-bold">
+                    Checks Data View
+                </div>
+                <div class="card-body p-0 table-responsive bg-white">
+                    <table class="table table-sm table-striped table-hover mb-0 small" style="font-size: 0.8rem;">
+                        <thead class="bg-light sticky-top">
+                            <tr>
+                                <th>Amount</th>
+                                <th>BusinessDate</th>
+                                <th>CashierId</th>
+                                <th>CheckType</th>
+                                <th>Fee</th>
+                                <th>GuestId</th>
+                                <th>LocationId</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Mock Data Rows -->
+                            @for (int i = 0; i < 20; i++)
+                            {
+                                <tr>
+                                    <td class="fw-bold text-end pe-4">@((150.00 + i * 10).ToString("N2"))</td>
+                                    <td>@DateTime.Today.ToShortDateString()</td>
+                                    <td>Admin</td>
+                                    <td>PAYROLL</td>
+                                    <td>1.59</td>
+                                    <td>@(1000 + i)</td>
+                                    <td>15</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-light py-1 small text-muted">
+                    Showing 20 of 20 Record(s)
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Filters Sidebar -->
+        <div class="bg-white border-start p-0 d-flex flex-column" style="width: 250px;">
+            <div class="bg-secondary text-white px-2 py-1 small fw-bold">
+                Check Types Filter
+            </div>
+            <div class="flex-grow-1 overflow-auto">
+                <div class="list-group list-group-flush small">
+                    <label class="list-group-item">
+                        <input class="form-check-input me-1" type="checkbox" checked>
+                        01. PAYROLL - LOCAL TYPED
+                    </label>
+                    <label class="list-group-item">
+                        <input class="form-check-input me-1" type="checkbox" checked>
+                        02. PAYROLL - HANDWRITTEN
+                    </label>
+                    <label class="list-group-item">
+                         <input class="form-check-input me-1" type="checkbox" checked>
+                        03. PAYROLL - OUT OF TOWN
+                    </label>
+                    <label class="list-group-item">
+                         <input class="form-check-input me-1" type="checkbox" checked>
+                        05. PAYROLL - RESTAURANTS
+                    </label>
+                    <label class="list-group-item">
+                         <input class="form-check-input me-1" type="checkbox" checked>
+                        15. MONEY ORDER(CASHING)
+                    </label>
+                     <label class="list-group-item">
+                         <input class="form-check-input me-1" type="checkbox" checked>
+                        16. WESTERN UNION
+                    </label>
+                     <label class="list-group-item">
+                         <input class="form-check-input me-1" type="checkbox" checked>
+                         18. BUSINESS CHECK
+                    </label>
+                     <label class="list-group-item">
+                         <input class="form-check-input me-1" type="checkbox" checked>
+                         20. UNEMPLOYMENT CHECK
+                    </label>
+                </div>
+            </div>
+            <div class="p-2 border-top bg-light">
+                 <button class="btn btn-outline-secondary btn-sm w-100">Select All</button>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<style>
+    .vcash-layout {
+        background-color: #f0f2f5;
+    }
+    .nav-pills .nav-link {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.8rem;
+        font-weight: bold;
+        color: #495057;
+        background-color: #e9ecef;
+    }
+    .nav-pills .nav-link.active {
+        background-color: #0d6efd; /* Primary blue to match legacy feel */
+        color: white;
+    }
+</style>
+
+@code {
+    private RenderFragment RenderTab(string name, bool isActive = false) => builder =>
+    {
+        builder.OpenElement(0, "li");
+        builder.AddAttribute(1, "class", "nav-item");
+        
+        builder.OpenElement(2, "a");
+        builder.AddAttribute(3, "class", $"nav-link {(isActive ? "active" : "")}");
+        builder.AddAttribute(4, "href", "#");
+        builder.AddAttribute(5, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, () => SelectTab(name)));
+        builder.AddContent(6, name);
+        
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private void SelectTab(string name)
+    {
+        // Placeholder for tab switching logic
+        // In a real implementation, this would switch the Grid's data source and columns.
+        // For POC, we stick to the static Checks view but announce the switch.
+        // JS.InvokeVoidAsync("console.log", $"Switched to {name}");
+    }
+
+    private async Task ExportExcel()
+    {
+        await JS.InvokeVoidAsync("alert", "Exporting data to Excel...");
+    }
+}

@@ -1,0 +1,995 @@
+
+@page "/vcash/transaction"
+@using vCashBlazorDemo.Models
+@inject vCashBlazorDemo.Services.TransactionService Service
+@inject vCashBlazorDemo.Services.GuestService GuestService
+@using vCash.Data.Models
+@using vCashBlazorDemo.Modals
+@using vCashBlazorDemo.Services
+@using vCashBlazorDemo.Pages
+@inject RiskService RiskAnalysisService
+@implements IDisposable
+
+<AddGuestModal @ref="AddGuest" OnGuestAdded="HandleGuestAdded" />
+<RiskAssessmentModal @ref="RiskModal" OnResolving="OnRiskResolved" />
+
+<PageTitle>vCash POS</PageTitle>
+
+<div class="container-fluid vcash-layout h-100">
+    <DispenserOverlay IsVisible="@IsProcessing" Amount="@_receiptTotals.NetCash" />
+
+    <div class="row h-100">
+        <!-- LEFT COLUMN -->
+        <div class="col-lg-7 d-flex flex-column gap-2">
+
+            <!-- 1. GUEST INFORMATION PANEL -->
+            <div class="card shadow-sm border-info" style="min-height: 180px;">
+                <div class="card-header bg-info text-white py-1 small fw-bold">Guest Information</div>
+                <div class="card-body p-2 d-flex">
+                    <!-- Left: Action Buttons Column -->
+                    <div class="d-flex flex-column gap-1 me-3">
+                        <button class="btn btn-success btn-sm fw-bold text-wrap border border-light shadow-sm" style="width: 80px; min-height: 60px; background-color: #76ff03; color: #000; border-color: #64dd17;" @onclick="OpenGuestLookup">
+                            <i class="bi bi-search d-block fs-5"></i> Guest Lookup
+                        </button>
+                        <button class="btn btn-light border btn-sm text-wrap fw-bold" style="width: 80px;" @onclick="OpenAddGuest">
+                            <i class="bi bi-person-plus d-block"></i> Add New Guest
+                        </button>
+                        <button class="btn btn-warning border btn-sm text-wrap fw-bold" style="width: 80px;" disabled="@(Service.CurrentGuest == null)" @onclick="EditCurrentGuest">
+                            <i class="bi bi-pencil-square d-block"></i> Edit Guest
+                        </button>
+                        <div class="d-flex gap-1 mt-auto">
+                            <button class="btn btn-info btn-sm text-white w-50" title="Info"><i class="bi bi-info-circle"></i></button>
+                            <button class="btn btn-danger btn-sm w-50" title="Close"><i class="bi bi-x-circle"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Guest Images & Info -->
+                    <div class="flex-grow-1 d-flex gap-2 position-relative bg-info bg-opacity-10 p-1 border border-info">
+                        @if (Service.CurrentGuest == null)
+                        {
+                            <!-- Placeholders -->
+                            <div class="bg-secondary bg-opacity-25 border d-flex align-items-center justify-content-center text-muted w-50 position-relative">
+                                <div class="text-center opacity-50">
+                                    <i class="bi bi-person-fill fs-1"></i>
+                                    <div>Guest Image</div>
+                                </div>
+                            </div>
+                            <div class="bg-secondary bg-opacity-25 border d-flex align-items-center justify-content-center text-muted w-50 position-relative">
+                                <div class="text-center opacity-50">
+                                    <i class="bi bi-card-heading fs-1"></i>
+                                    <div>Scan Guest ID</div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <!-- 1. Guest Photo with Name Badge -->
+                            <div class="w-50 position-relative border border-dark bg-dark overflow-hidden d-flex align-items-center justify-content-center">
+                                <!-- Name Badge Overlay -->
+                                <div class="position-absolute top-0 start-50 translate-middle-x mt-2 px-2 py-0 fw-bold shadow-sm"
+                                     style="background-color: #00897b; color: #ffeb3b; font-family: sans-serif; letter-spacing: 1px; font-size: 0.9rem; z-index: 10;">
+                                    @Service.CurrentGuest.FullName.ToUpper()
+                                </div>
+
+                                <!-- Guest Image (Using Generated Mock or Real Capture) -->
+                                <img src="@(string.IsNullOrEmpty(Service.CurrentGuest.PhotoUrl) ? "images/guest_webcam_photo.png" : Service.CurrentGuest.PhotoUrl)" class="img-fluid w-100 h-100" style="object-fit: cover;" />
+                            </div>
+
+                            <!-- 2. ID Card Image -->
+                            <div class="w-50 border border-dark bg-secondary d-flex align-items-center justify-content-center overflow-hidden position-relative">
+                                <img src="@(string.IsNullOrEmpty(Service.CurrentGuest.PhotoIdUrl) ? "images/guest_id_card_scan.png" : Service.CurrentGuest.PhotoIdUrl)" class="img-fluid w-100" style="object-fit: contain;" />
+
+                                <!-- Scan Overlay Button (Mock) -->
+                                @if (Service.CurrentGuest.IsBanned)
+                                {
+                                    <div class="position-absolute top-50 start-50 translate-middle bg-danger text-white px-3 py-2 fw-bold shadow border border-white">
+                                        BANNED
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. TRANSACTION INFORMATION PANEL -->
+            <div class="card shadow-sm border-info flex-grow-1">
+                <div class="card-header bg-info text-white py-1 small fw-bold">Transaction Information</div>
+                <div class="card-body p-2">
+
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs nav-tabs-sm mb-2">
+                        <li class="nav-item">
+                            <a class="nav-link @(Service.ActiveTab == "Checks" ? "active" : "")" role="button" style="cursor: pointer" @onclick='() => Service.SetActiveTab("Checks")'>Checks</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(Service.ActiveTab == "MoneyOrder" ? "active" : "")" role="button" style="cursor: pointer" @onclick='() => Service.SetActiveTab("MoneyOrder")'>Money Orders</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(Service.ActiveTab == "Wire" ? "active" : "")" role="button" style="cursor: pointer" @onclick='() => Service.SetActiveTab("Wire")'>Wire Transfer</a>
+                        </li>
+                    </ul>
+
+                    @if (Service.ActiveTab == "Checks")
+                    {
+                        <!-- Check Inputs Row -->
+                        <div class="row g-1 mb-2">
+                            <div class="col-auto d-flex flex-column gap-1">
+                                <button class="btn btn-light border d-flex flex-column align-items-center justify-content-center p-1" style="width: 80px; height: 80px;" @onclick="OpenScanCheck">
+                                    <i class="bi bi-upc-scan fs-3"></i>
+                                    <small class="fw-bold" style="font-size: 0.7rem;">Scan Check</small>
+                                </button>
+                                
+                                <button class="btn btn-dark border d-flex flex-column align-items-center justify-content-center p-1" style="width: 80px; height: 80px;" @onclick="OpenDispenserInventory">
+                                    <img src="images/recycler_icon.png" style="width: 40px; height: 40px; object-fit: contain;" />
+                                    <small class="fw-bold text-white mt-1" style="font-size: 0.65rem;">Inventory</small>
+                                </button>
+                            </div>
+                            <div class="col">
+                                <div class="row g-1">
+                                    <div class="col-4">
+                                        <label class="small text-muted mb-0">Routing #</label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="123456789" @bind="InputRouting" />
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="small text-muted mb-0">Account Number</label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="00012345" @bind="InputAccount" />
+                                    </div>
+                                    <div class="col-2">
+                                        <label class="small text-muted mb-0">Check #</label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="1001" @bind="InputCheckNum" />
+                                    </div>
+                                    <div class="col-2">
+                                        <label class="small text-muted mb-0">Date</label>
+                                        <input type="text" class="form-control form-control-sm" placeholder="12/14/2025" @bind="InputDateString" />
+                                    </div>
+                                    <div class="col-12 mt-1">
+                                        <label class="small text-muted mb-0">Detected Maker</label>
+                                        <input type="text" class="form-control form-control-sm bg-light fw-bold text-primary" readonly value="@DetectedMakerName" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Check Image & Amounts Row -->
+                        <div class="row g-2 h-100">
+                            <!-- Check Image Mockup -->
+                            <div class="col-8">
+                                <div class="bg-secondary bg-opacity-25 border d-flex align-items-center justify-content-center text-muted position-relative overflow-hidden" style="min-height: 275px; background-color: #e9ecef;">
+                                    @if (!IsCheckScanned || InputAmount <= 0)
+                                    {
+                                        <h3 class="fw-light">Check Image</h3>
+                                    }
+                                    else
+                                    {
+                                        <!-- Replicating the Digital Check Visual -->
+                                        <div class="bg-white p-4 shadow-sm" style="width: 80%; height: 60%; transform: rotate(-1deg); border: 1px solid #dee2e6;">
+                                            <div class="border-bottom pb-2 mb-3 d-flex justify-content-between align-items-end">
+                                                <span class="font-monospace small text-muted">Pay to the Order of</span>
+                                                <span class="font-monospace fw-bold fs-4">$@InputAmount.ToString("N2")</span>
+                                            </div>
+                                            <div class="d-flex align-items-center justify-content-center my-4">
+                                                <div class="font-cursive fs-1 text-dark" style="font-family: 'Brush Script MT', cursive; transform: rotate(-2deg);">Authorized Payee</div>
+                                            </div>
+                                            <div class="border-top pt-2 d-flex justify-content-between small text-muted font-monospace mt-auto">
+                                                <span>⑆123456789⑆</span>
+                                                <span>00012345⑈</span>
+                                                <span>1001</span>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Amount & Add Button -->
+                            <div class="col-4 d-flex flex-column gap-2">
+                                <div>
+                                    <label class="small fw-bold">Chk Amt</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control fw-bold text-end" @bind="InputAmount" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="small text-muted">Fee</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        <input type="text" class="form-control text-end bg-light" readonly value="@((InputAmount * 0.01m).ToString("0.00"))" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="small text-muted">Net</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text">$</span>
+                                        <input type="text" class="form-control text-end bg-light" readonly value="@((InputAmount * 0.99m).ToString("0.00"))" />
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-column gap-2 mt-2">
+                                    <button class="btn btn-secondary py-2 w-100" @onclick="AddCheckFromInput">
+                                        <i class="bi bi-cart-plus"></i> Add to cart
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm w-100">
+                                        <i class="bi bi-x-circle"></i> Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Money Order Inputs -->
+                    @if (Service.ActiveTab == "MoneyOrder")
+                    {
+                        <div class="row g-3 h-100 align-items-center justify-content-center">
+                            <div class="col-12">
+                                <div class="card bg-light border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="fw-bold text-dark text-uppercase mb-3 border-bottom pb-2">Money Order</h5>
+                                        
+                                         <div class="row g-2 align-items-end">
+                                            <div class="col-12">
+                                                <label class="small fw-bold text-muted">Payee</label>
+                                                <input type="text" class="form-control" placeholder="e.g. Utility Co, Landlord" @bind="MoneyOrderPayee" />
+                                            </div>
+                                            
+                                            <div class="col-6">
+                                                <label class="small fw-bold text-muted">Amount</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-white border-end-0">$</span>
+                                                    <input type="number" class="form-control border-start-0 fw-bold" placeholder="0.00" 
+                                                           @bind="MoneyOrderAmount" @bind:after="RecalculateMoneyOrder" />
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-6">
+                                                 <label class="small fw-bold text-muted">Total (w/ Fee)</label>
+                                                 <div class="input-group">
+                                                    <span class="input-group-text bg-light border-end-0 text-muted">$</span>
+                                                    <input type="text" class="form-control bg-light border-start-0 fw-bold text-primary" readonly value="@MoneyOrderTotal.ToString("N2")" />
+                                                 </div>
+                                            </div>
+
+                                             <div class="col-12 d-flex justify-content-between align-items-center mt-2">
+                                                 <span class="badge bg-white text-muted border">Fee: @MoneyOrderFee.ToString("C2")</span>
+                                                 <div class="d-flex gap-2">
+                                                     <button class="btn btn-outline-danger btn-sm" @onclick="ClearMoneyOrderInput">
+                                                         <i class="bi bi-x-circle"></i> Clear
+                                                     </button>
+                                                     <button class="btn btn-primary fw-bold" @onclick="AddMoneyOrder">
+                                                        <i class="bi bi-plus-circle me-1"></i> Add to Cart
+                                                     </button>
+                                                 </div>
+                                             </div>
+                                         </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Wire Transfer Inputs -->
+                    @if (Service.ActiveTab == "Wire")
+                    {
+                        <div class="row g-3 h-100 align-items-center justify-content-center">
+                            <div class="col-12">
+                                <div class="card bg-light border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="fw-bold text-dark text-uppercase mb-3 border-bottom pb-2">Wire Transfer</h5>
+                                        
+                                        <div class="row">
+                                            <!-- Validated Radio Types -->
+                                            <div class="col-5 border-end pe-4">
+                                                <label class="form-label fw-bold text-muted mb-3">Transfer Type</label>
+                                                <div class="d-flex flex-column gap-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="wireType" id="sendCash" 
+                                                               checked="@(WireType == "SendCash")" 
+                                                               @onchange="@(() => SetWireType("SendCash"))">
+                                                        <label class="form-check-label fw-bold" for="sendCash">
+                                                            Send Cash
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="wireType" id="sendDebit"
+                                                               checked="@(WireType == "SendDebit")" 
+                                                               @onchange="@(() => SetWireType("SendDebit"))">
+                                                        <label class="form-check-label fw-bold" for="sendDebit">
+                                                            Send Using Debit Card
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="radio" name="wireType" id="receiveCheckless"
+                                                               checked="@(WireType == "Receive")" 
+                                                               @onchange="@(() => SetWireType("Receive"))">
+                                                        <label class="form-check-label fw-bold" for="receiveCheckless">
+                                                            Receive Checkless
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Dynamic Inputs -->
+                                            <div class="col-7 ps-4">
+                                                <div class="row g-2">
+                                                    
+                                                    <!-- Common: Amount -->
+                                                    <div class="col-12">
+                                                        <label class="small fw-bold text-muted">Amount</label>
+                                                        <div class="input-group">
+                                                            <span class="input-group-text bg-white border-end-0">$</span>
+                                                            <input type="number" class="form-control border-start-0 fw-bold" placeholder="0.00" 
+                                                                   @bind="WireAmount" @bind:after="RecalculateWire" />
+                                                        </div>
+                                                    </div>
+
+                                                    @if (WireType == "SendCash" || WireType == "SendDebit")
+                                                    {
+                                                        <div class="col-12">
+                                                            <label class="small fw-bold text-muted">Fee</label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text bg-light border-end-0 text-muted">$</span>
+                                                                <input type="number" class="form-control bg-light border-start-0 fw-bold" 
+                                                                       @bind="WireFee" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="small fw-bold text-muted">Total</label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text bg-light border-end-0 text-muted">$</span>
+                                                                <input type="text" class="form-control bg-light border-start-0 fw-bold text-primary" readonly value="@WireTotal.ToString("N2")" />
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                    else if (WireType == "Receive")
+                                                    {
+                                                        <div class="col-12">
+                                                            <label class="small fw-bold text-muted">MTCN</label>
+                                                            <input type="text" class="form-control fw-bold" placeholder="000-000-0000" @bind="WireMTCN" />
+                                                        </div>
+                                                    }
+
+                                                    <div class="col-12 mt-3 d-flex gap-2 justify-content-end">
+                                                         <button class="btn btn-outline-danger btn-sm" @onclick="ClearWireInput">
+                                                             <i class="bi bi-x-circle"></i> Clear
+                                                         </button>
+                                                         <button class="btn btn-primary fw-bold" @onclick="AddWireTransaction">
+                                                            <i class="bi bi-cart-plus me-1"></i> Add to Cart
+                                                         </button>
+                                                    </div>
+
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: GUEST CART -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-primary h-100">
+                <div class="card-header bg-primary text-white py-1 small fw-bold">Guest Cart</div>
+                
+                <!-- The Grid -->
+                <div class="card-body p-0 d-flex flex-column">
+                    <div class="flex-grow-1 bg-white" style="min-height: 300px;">
+                    <table class="table table-sm table-bordered mb-0 small">
+                        <thead class="bg-primary text-white" style="--bs-bg-opacity: .8;">
+                            <tr>
+                                <th style="width: 25%;">Transaction Type</th>
+                                <th class="text-end" style="width: 15%;">Amount</th>
+                                <th class="text-end" style="width: 15%;">Fee</th>
+                                <th class="text-end" style="width: 22%;">Cash In</th>
+                                <th class="text-end" style="width: 23%;">Cash Out</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in CartItems)
+                            {
+                                <tr class="@(item.IsVoid ? "text-decoration-line-through text-muted" : "")">
+                                    <td class="small">@item.Type</td>
+                                    <td class="text-end small">@item.Amount.ToString("0.00")</td>
+                                    <td class="text-end small">@item.Fee.ToString("0.00")</td>
+                                    <td class="text-end fw-bold @(item.CashIn > 0 ? "text-success" : "text-muted")">
+                                        @if(item.CashIn > 0) { @item.CashIn.ToString("0.00") }
+                                    </td>
+                                    <td class="text-end fw-bold @(item.CashOut > 0 ? "text-danger" : "text-muted")">
+                                        @if(item.CashOut > 0) { @item.CashOut.ToString("0.00") }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                    <!-- Totals Bar -->
+                    <div class="bg-primary text-white px-2 py-1 d-flex justify-content-between small fw-bold">
+                        <span>Totals</span>
+                        <div>
+                           <span class="me-2" title="Fees">F: @TotalFees.ToString("0.00")</span>
+                           <span class="me-2 text-warning" title="Cash In">In: @CartItems.Sum(x => x.CashIn).ToString("0.00")</span>
+                           <span class="text-info" title="Cash Out">Out: @CartItems.Sum(x => x.CashOut).ToString("0.00")</span>
+                        </div>
+                    </div>
+
+                    <!-- Lower Action Area -->
+                    <div class="p-2 bg-light border-top">
+                        <div class="row">
+                            <div class="col-5 d-flex flex-column gap-2 shadow-sm p-2 bg-white">
+                                <button class="btn btn-success fw-bold py-3" @onclick="HandleCheckout">Check Out</button>
+                                <button class="btn btn-danger btn-sm" @onclick="ClearCart">Void All</button>
+                            </div>
+                            <div class="col-7">
+                                <!-- Cart Summary Box -->
+                                <div class="bg-white border p-2 shadow-sm small">
+                                    <div class="fw-bold border-bottom mb-1">Cart Summary</div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Cash In</span>
+                                        <span>@CartItems.Sum(x => x.CashIn).ToString("C")</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Cash Out</span>
+                                        <span>@CartItems.Sum(x => x.CashOut).ToString("C")</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between fw-bold fs-6 mt-2">
+                                        <span>@(NetCash >= 0 ? "Total Due" : "Guest Receives")</span>
+                                        <span>@Math.Abs(NetCash).ToString("C")</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Green Footer Bar -->
+                    <div class="bg-success text-white p-2 mt-2 fw-bold text-center small">
+                        READY TO SCAN
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<GuestLookupModal @ref="GuestLookup" OnGuestSelected="HandleGuestSelected" />
+<ScanCheckModal @ref="ScanCheck" OnCheckAccepted="HandleCheckScanAccepted" AvailableMakers="@AvailableMakers" />
+<ReceiptModal @ref="Receipt" 
+              Items="@_receiptItems"
+              TotalFees="@_receiptTotals.TotalFees"
+              TotalCashIn="@_receiptTotals.CashIn"
+              TotalCashOut="@_receiptTotals.CashOut"
+              NetPayout="@_receiptTotals.NetCash"
+              DispensedBills="@_receiptBills"
+              Change="@_receiptChange"
+              OnClose="HandleReceiptClose" />
+
+<CashPaymentModal @ref="CashPaymentModalRef" OnPaymentConfirmed="HandleCashPayment" />
+<DispenserInventoryModal @ref="InventoryModal" />
+
+<style>
+    .vcash-layout {
+        background-color: #f0f2f5;
+        padding-top: 10px;
+        height: 95vh;
+    }
+
+    .nav-tabs-sm .nav-link {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .form-control-sm, .form-select-sm {
+        padding: 0.25rem 0.4rem;
+        font-size: 0.8rem;
+    }
+</style>
+
+@code {
+    private IEnumerable<vCashBlazorDemo.Models.TransactionModel> CartItems => Service.GetCart();
+    private decimal TotalFees;
+    private decimal NetCash;
+
+    // UI Refs
+    private GuestLookupModal GuestLookup;
+    private ScanCheckModal ScanCheck = default!;
+    
+    // UI State
+    // SelectedGuest and ActiveTab are now managed by TransactionService
+    // UI State
+    // SelectedGuest and ActiveTab are now managed by TransactionService
+    private decimal InputAmount = 0.00m;
+    private string InputRouting { get; set; } = string.Empty;
+    private string InputAccount { get; set; } = string.Empty;
+    private string InputCheckNum { get; set; } = string.Empty;
+    private string InputDateString { get; set; } = DateTime.Today.ToShortDateString();
+    
+    private string DetectedMakerName { get; set; } = "Scan Check or Enter Routing #";
+    
+    // private GuestModel? SelectedGuest; // Removed
+    private bool IsCheckScanned = false;
+    private bool IsProcessing = false;
+    private ReceiptModal Receipt;
+    private CashPaymentModal CashPaymentModalRef;
+    private DispenserInventoryModal InventoryModal;
+    
+    // Cached List of Makers for Demo/Scan
+    private IEnumerable<Maker> AvailableMakers = new List<Maker>();
+
+    protected override void OnInitialized()
+    {
+        Service.OnChange += HandleServiceChange;
+        CalculateTotals();
+    }
+
+    private void HandleServiceChange()
+    {
+        CalculateTotals();
+        StateHasChanged();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // No longer needed for logic, kept empty or removed.
+    }
+
+    private void CalculateTotals()
+    {
+        var totals = Service.GetTotals();
+        TotalFees = totals.TotalFees;
+        NetCash = totals.NetCash;
+    }
+
+    @inject IJSRuntime JS
+
+    private AddGuestModal AddGuest = default!; // Add Ref
+
+    private async Task OpenGuestLookup()
+    {
+        await JS.InvokeVoidAsync("console.log", "TransactionPage: OpenGuestLookup clicked.");
+        if (GuestLookup == null)
+        {
+            await JS.InvokeVoidAsync("console.log", "TransactionPage: GuestLookup REF is NULL!");
+        }
+        else
+        {
+            await GuestLookup.Show();
+        }
+    }
+
+    // Open Add Guest Modal
+    private void OpenAddGuest()
+    {
+        AddGuest.Show();
+    }
+
+    // Open Edit Guest Modal
+    private void EditCurrentGuest()
+    {
+        if (Service.CurrentGuest != null)
+        {
+            AddGuest.Show(Service.CurrentGuest);
+        }
+    }
+
+    // Receipt Snapshot Data
+    private IEnumerable<TransactionModel> _receiptItems = new List<TransactionModel>();
+    private TransactionTotals _receiptTotals = new TransactionTotals();
+    private Dictionary<int, int> _receiptBills = new();
+    private decimal _receiptChange = 0;
+
+    private void CalculatePayoutDetails(decimal totalAmount)
+    {
+        _receiptBills.Clear();
+        _receiptChange = 0;
+
+        decimal remaining = totalAmount;
+        int[] denoms = new[] { 100, 20, 5, 1 };
+
+        foreach (var d in denoms)
+        {
+            int count = (int)(remaining / d);
+            _receiptBills[d] = count;
+            remaining -= count * d;
+        }
+
+        _receiptChange = remaining;
+    }
+
+    // Auto-select the guest after adding
+    private async Task HandleGuestAdded(GuestModel newGuest)
+    {
+        // For new adds, we might already have the data in newGuest from the modal,
+        // BUT to be safe and ensure ID image is populated if it came from DB save roundtrip,
+        // we can reload or just trust the Modal return. 
+        // However, user said "after save... guest image updated but ID isn't" implies maybe Modal returned partially?
+        // Let's reload to be safe.
+        await LoadGuestImagesAndSelect(newGuest);
+    }
+
+    private async Task HandleGuestSelected(GuestModel guest)
+    {
+        if (guest != null)
+        {
+            await LoadGuestImagesAndSelect(guest);
+        }
+    }
+
+    private async Task LoadGuestImagesAndSelect(GuestModel guest)
+    {
+        await GuestService.LoadCandidateImagesAsync(guest);
+        Service.SetGuest(guest);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OpenScanCheck()
+    {
+        if (AvailableMakers == null || !AvailableMakers.Any())
+        {
+            // Fetch for Location 2 (Hardcoded default in seed often, or user's specific requirement)
+            // Ideally should be dynamic location from Session/Config. 
+            // The seed used "2" for LocationId in DRM, but earlier code used "15".
+            var locationId = 2; // Default scan location
+            var makers = await Service.GetRandomMakersAsync(locationId);
+            
+            if (makers == null || !makers.Any())
+            {
+                 makers = await Service.GetRandomMakersAsync(15);
+            }
+            
+            AvailableMakers = makers?.ToList() ?? new List<Maker>();
+            CurrentScanLocationId = (AvailableMakers.FirstOrDefault()?.LocationId) as int? ?? 15; 
+        }
+    
+        ScanCheck.Show();
+    }
+    
+    // Track which location we pulled makers from
+    private int CurrentScanLocationId = 15;
+
+    private async Task OpenDispenserInventory()
+    {
+        await InventoryModal.Show();
+    }
+
+    private async Task HandleCheckScanAccepted(CheckScanResult result)
+    {
+        // Populate Inputs
+        InputAmount = result.Amount;
+        InputRouting = result.RoutingNumber;
+        InputAccount = result.AccountNumber;
+        InputCheckNum = result.CheckNumber;
+        IsCheckScanned = true;
+
+        DetectedMakerName = "Identifying Maker..."; // Immediate UI Feedback
+
+        // Decouple the expensive lookup so the UI/Modal can close cleanly immediately
+        _ = LookupMakerAsync(InputRouting, InputAccount);
+    }
+
+    private async Task LookupMakerAsync(string rt, string acct)
+    {
+        try
+        {
+            // Small delay to ensure Modal close animation clears if needed (optional but smooths UX)
+            await Task.Delay(100); 
+            
+            // Use the location ID we used for scanning, or default to 15
+            var maker = await Service.GetMakerAsync(rt, acct, CurrentScanLocationId);
+            
+            // Marshall back to UI thread
+            await InvokeAsync(() =>
+            {
+                if (maker != null)
+                {
+                    DetectedMakerName = maker.Name;
+                }
+                else
+                {
+                    DetectedMakerName = "Unknown / New Maker";
+                }
+                StateHasChanged();
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Lookup Error: {ex.Message}");
+            await InvokeAsync(() => 
+            {
+                DetectedMakerName = $"Error: {ex.Message}";
+                StateHasChanged();
+            });
+        }
+    }
+
+    private RiskAssessmentModal RiskModal;
+    
+    private async Task AddCheckFromInput()
+    {
+        if (InputAmount <= 0) return;
+        
+        if (Service.CurrentGuest == null)
+        {
+            await JS.InvokeVoidAsync("alert", "Please select a guest first.");
+            return;
+        }
+
+        // 1. Data Gathering
+        // In a real scan, these would be populated. For manual/demo, we use inputs.
+        // We need to look up Maker and Bank.
+        var maker = !string.IsNullOrEmpty(InputRouting) && !string.IsNullOrEmpty(InputAccount) 
+                    ? await Service.GetMakerAsync(InputRouting, InputAccount) 
+                    : null;
+                    
+        var bank = !string.IsNullOrEmpty(InputRouting) 
+                   ? await Service.GetBankAsync(InputRouting) 
+                   : null;
+
+        // 2. Risk Analysis
+
+        // Map GuestModel to Data.Guest for Service Layer
+        // Map GuestModel to Data.Guest for Service Layer
+        var dataGuest = MapToDataGuest(Service.CurrentGuest);
+        var riskResult = await RiskAnalysisService.AnalyzeRiskAsync(InputAmount, dataGuest, maker, bank);
+
+        if (riskResult.NeedsRiskManagement)
+        {
+            RiskModal.Show(riskResult, maker, bank, InputRouting, InputAccount, InputCheckNum);
+            return; // Wait for callback
+        }
+
+        // 3. Add to Cart (No Risk)
+        Service.AddCheck(InputAmount);
+        ClearCheckInputs();
+    }
+    
+    private void OnRiskResolved(bool approved)
+    {
+         if (approved)
+         {
+             Service.AddCheck(InputAmount);
+             ClearCheckInputs();
+         }
+         else
+         {
+             // Declined logic?
+         }
+         StateHasChanged();
+    }
+
+    private void ClearCheckInputs()
+    {
+        InputAmount = 0; 
+        IsCheckScanned = false; 
+        InputRouting = "";
+        InputAccount = "";
+        InputCheckNum = "";
+        StateHasChanged();
+    }
+
+    private vCash.Data.Models.Guest MapToDataGuest(vCashBlazorDemo.Models.GuestModel model)
+    {
+        if (model == null) return null;
+        
+        int.TryParse(model.Zip, out int zipCode);
+
+        return new vCash.Data.Models.Guest
+        {
+            GuestId = model.GuestId,
+            FirstName = model.FirstName,
+            LastName = model.LastName,
+            MiddleName = model.MiddleName,
+            AddressLine1 = model.Address,
+            City = model.City,
+            State = model.State,
+            Zip = zipCode,
+            DrLicNbr = model.DLNumber,
+            DrLicState = model.DLState,
+            BirthDate = model.BirthDate,
+            SSN = model.SSN,
+            AccountLimit = model.AccountLimit,
+            Blocked = model.IsBanned,
+            Comment = model.Notes
+        };
+    }
+
+    // --- Wire & Money Order Inputs ---
+    // (Logic moved here from Razor binding if needed, or kept simple)
+    private string MoneyOrderPayee { get; set; } = "";
+    private decimal MoneyOrderAmount { get; set; }
+    private decimal MoneyOrderFee { get; set; }
+    private decimal MoneyOrderTotal => MoneyOrderAmount + MoneyOrderFee;
+
+    private void RecalculateMoneyOrder()
+    {
+        // Fee = $1.59
+        MoneyOrderFee = 1.59m;
+    }
+
+    private void ClearMoneyOrderInput()
+    {
+        MoneyOrderPayee = "";
+        MoneyOrderAmount = 0;
+        MoneyOrderFee = 0;
+    }
+
+    private void AddMoneyOrder()
+    {
+        if (MoneyOrderAmount <= 0) return;
+        
+        Service.AddMoneyOrder(MoneyOrderAmount, MoneyOrderPayee);
+        ClearMoneyOrderInput();
+    }
+
+    // Wire
+    private string WireType { get; set; } = "SendCash"; // SendCash, SendDebit, Receive
+    private decimal WireAmount { get; set; }
+    private decimal WireFee { get; set; }
+    private string WireMTCN { get; set; } = "";
+    private decimal WireTotal => WireAmount + WireFee;
+
+    private void SetWireType(string type)
+    {
+        WireType = type;
+        WireAmount = 0;
+        WireFee = 0;
+        WireMTCN = "";
+    }
+
+    private void RecalculateWire()
+    {
+        // Dummy Fee Logic
+        if (WireType == "SendCash" || WireType == "SendDebit")
+        {
+            WireFee = Math.Max(5.00m, WireAmount * 0.05m); // 5% or $5
+        }
+        else
+        {
+            WireFee = 0;
+        }
+    }
+
+    private void ClearWireInput()
+    {
+        WireAmount = 0;
+        WireFee = 0;
+        WireMTCN = "";
+    }
+
+    private void AddWireTransaction()
+    {
+        if (WireAmount <= 0) return;
+
+        if (WireType == "SendCash")
+        {
+            Service.AddWireSend(WireAmount, WireFee, WireTotal);
+        }
+        else if (WireType == "SendDebit")
+        {
+             Service.AddWireSendDebit(WireAmount, WireFee, WireTotal);
+        }
+        else if (WireType == "Receive")
+        {
+             Service.AddWireReceiveCheckless(WireAmount, WireMTCN);
+        }
+
+        ClearWireInput();
+    }
+
+    // Checkout
+    private void HandleCheckout()
+    {
+        if (!Service.GetCart().Any()) 
+        {
+            JS.InvokeVoidAsync("alert", "Cart is empty.");
+            return;
+        }
+
+        var totals = Service.GetTotals();
+        
+        // Example: If NetCash > 0, Guest owes us money (e.g. Money Order, Wire Send).
+        // If NetCash < 0, We owe guest money (e.g. Check Cashing).
+        // If NetCash = 0, Balanced?
+        
+        if (totals.NetCash > 0)
+        {
+            // Guest Owes: Must Pay Cash or Card? For Demo assume Cash In.
+            // Show Payment Modal
+            CashPaymentModalRef.Show(totals.NetCash);
+        }
+        else if (totals.NetCash < 0)
+        {
+            // We Owe Guest: Dispense Cash
+            // Confirm dispensing?
+             CashPaymentModalRef.Show(totals.NetCash); // Reuse modal but it might show "Dispensing..."
+        }
+        else
+        {
+            // Zero balance (rare)
+            // Just submit
+             _ = CompleteCheckout(new vCash.Data.Models.BillCounts());
+        }
+    }
+
+    private async Task HandleCashPayment(vCash.Data.Models.BillCounts paidIn)
+    {
+        await CompleteCheckout(paidIn);
+    }
+
+    private async Task CompleteCheckout(vCash.Data.Models.BillCounts paidIn)
+    {
+        IsProcessing = true;
+        StateHasChanged();
+
+        // Simulate Hardware Delay
+        await Task.Delay(2000);
+
+        var result = await Service.ProcessCashTransaction(paidIn);
+        
+        IsProcessing = false;
+
+        if (result.Success)
+        {
+            // Show Receipt
+            _receiptItems = Service.GetCart().ToList(); // Copy
+            // Snapshoting totals
+            var t = Service.GetTotals();
+            _receiptTotals = new TransactionTotals 
+            { 
+                TotalFees = t.TotalFees, 
+                CashIn = t.CashIn, 
+                CashOut = t.CashOut, 
+                NetCash = t.NetCash 
+            };
+            
+            // Check if we need to breakdown change?
+            // ProcessCashTransaction returns ChangeCounts (BillCounts).
+            // But ReceiptModal expects Dict<int,int>. Map it.
+            _receiptBills.Clear();
+            if (result.ChangeCounts != null)
+            {
+                if (result.ChangeCounts.Hundreds > 0) _receiptBills[100] = result.ChangeCounts.Hundreds;
+                if (result.ChangeCounts.Fifties > 0) _receiptBills[50] = result.ChangeCounts.Fifties;
+                if (result.ChangeCounts.Twenties > 0) _receiptBills[20] = result.ChangeCounts.Twenties;
+                if (result.ChangeCounts.Tens > 0) _receiptBills[10] = result.ChangeCounts.Tens;
+                if (result.ChangeCounts.Fives > 0) _receiptBills[5] = result.ChangeCounts.Fives;
+                if (result.ChangeCounts.Ones > 0) _receiptBills[1] = result.ChangeCounts.Ones;
+            }
+
+            Receipt.Show();
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", $"Transaction Failed: {result.Message}");
+        }
+        
+        StateHasChanged();
+    }
+
+    private void HandleReceiptClose()
+    {
+        // Clear Cart and Reset
+        Service.Clear();
+        // Also clear local inputs
+        ClearCheckInputs();
+        ClearMoneyOrderInput();
+        ClearWireInput();
+        DetectedMakerName = "Scan Check or Enter Routing #";
+        StateHasChanged();
+    }
+
+    private void ClearCart()
+    {
+        Service.Clear();
+    }
+
+    public void Dispose()
+    {
+        Service.OnChange -= HandleServiceChange;
+    }
+}

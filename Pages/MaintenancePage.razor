@@ -1,0 +1,147 @@
+@page "/vcash/maintenance"
+@inject IJSRuntime JS
+
+<PageTitle>vCash Maintenance</PageTitle>
+
+<div class="container-fluid vcash-layout h-100 p-4">
+    
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">System Maintenance</h2>
+            <div class="text-muted small">Manage entities, hardware configuration, and cashier setttings</div>
+        </div>
+        <div>
+            <span class="badge bg-secondary">Station ID: 15</span>
+        </div>
+    </div>
+
+    <!-- Dashboard Grid -->
+    <div class="row g-4">
+        
+        <!-- 1. Basic Maintenance -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded">
+                            <i class="bi bi-tools text-primary fs-4"></i>
+                        </div>
+                        <h5 class="fw-bold mb-0">Basic Maintenance</h5>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        @RenderMaintItem("Guest Management", "Edit or merge guest profiles.", "bi-people", "Basic")
+                        @RenderMaintItem("Maker List", "Manage authorized check makers.", "bi-building", "Basic")
+                        @RenderMaintItem("Dispenser Config", "Calibrate or test the cash recycler.", "bi-safe", "Hardware")
+                        @RenderMaintItem("Count Drawer", "Perform a manual till count.", "bi-calculator", "Daily")
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Manager Functions -->
+        <div class="col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="d-flex align-items-center gap-2">
+                         <div class="bg-danger bg-opacity-10 p-2 rounded">
+                            <i class="bi bi-shield-lock text-danger fs-4"></i>
+                        </div>
+                        <h5 class="fw-bold mb-0">Manager Functions</h5>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        @RenderMaintItem("Cashiers & Users", "Manage logins and permissions.", "bi-person-badge", "Admin")
+                        @RenderMaintItem("Fee Schedule", "Update check cashing rates.", "bi-currency-dollar", "Admin")
+                        @RenderMaintItem("Workstation Settings", "Configure local device preferences.", "bi-display", "System")
+                        @RenderMaintItem("WebCam Diagnostics", "Test camera feed and quality.", "bi-camera-video", "System")
+                    </div>
+                </div>
+                 <div class="card-footer bg-light border-0">
+                    <small class="text-muted"><i class="bi bi-lock-fill me-1"></i> Requires Manager Override</small>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .vcash-layout {
+        background-color: #f0f2f5;
+    }
+    
+    .list-group-item-action:hover {
+        background-color: #f8f9fa;
+        padding-left: 1.5rem;
+        transition: all 0.2s ease;
+    }
+    
+    .list-group-item {
+        transition: all 0.2s ease;
+        border-right: 0;
+        border-left: 0;
+    }
+</style>
+
+@code {
+    private RenderFragment RenderMaintItem(string title, string desc, string icon, string tag) => builder =>
+    {
+        builder.OpenElement(0, "button");
+        builder.AddAttribute(1, "class", "list-group-item list-group-item-action py-3 d-flex align-items-center gap-3 border-0 border-bottom");
+        builder.AddAttribute(2, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create<Microsoft.AspNetCore.Components.Web.MouseEventArgs>(this, () => RunAction(title)));
+
+        // Icon Box
+        builder.OpenElement(3, "div");
+        builder.AddAttribute(4, "class", "text-secondary fs-4 d-flex align-items-center justify-content-center");
+        builder.AddAttribute(5, "style", "width: 40px;");
+        builder.OpenElement(6, "i");
+        builder.AddAttribute(7, "class", $"bi {icon}");
+        builder.CloseElement();
+        builder.CloseElement();
+
+        // Content
+        builder.OpenElement(8, "div");
+        builder.AddAttribute(9, "class", "flex-grow-1");
+        
+        builder.OpenElement(10, "div");
+        builder.AddAttribute(11, "class", "d-flex justify-content-between align-items-center mb-0");
+        builder.OpenElement(12, "span");
+        builder.AddAttribute(13, "class", "fw-bold text-dark");
+        builder.AddContent(14, title);
+        builder.CloseElement();
+        
+        // Badge
+        builder.OpenElement(15, "span");
+        builder.AddAttribute(16, "class", "badge bg-light text-secondary border fw-normal");
+        builder.AddContent(17, tag);
+        builder.CloseElement();
+        builder.CloseElement();
+
+        // Description
+        builder.OpenElement(18, "div");
+        builder.AddAttribute(19, "class", "small text-muted mt-1");
+        builder.AddContent(20, desc);
+        builder.CloseElement();
+        
+        builder.CloseElement(); // Content div
+
+        // Chevron
+        builder.OpenElement(21, "div");
+        builder.AddAttribute(22, "class", "text-muted opacity-25 ms-2");
+         builder.OpenElement(23, "i");
+        builder.AddAttribute(24, "class", "bi bi-chevron-right");
+        builder.CloseElement();
+        builder.CloseElement();
+
+        builder.CloseElement(); // Button
+    };
+
+    private async Task RunAction(string actionName)
+    {
+        await JS.InvokeVoidAsync("alert", $"Opening Maintenance Module: {actionName}");
+    }
+}

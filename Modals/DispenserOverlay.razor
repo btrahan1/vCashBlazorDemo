@@ -1,0 +1,133 @@
+@using System.Threading.Tasks
+
+@if (IsVisible)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" 
+         style="background-color: rgba(0,0,0,0.9); z-index: 20000; color: #fff; backdrop-filter: blur(5px);">
+        
+        <h2 class="fw-bold mb-4 text-uppercase text-success" style="letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,0,0.5);">DISPENSING CASH</h2>
+        
+        <!-- Dispenser Machine Visual -->
+        <div class="position-relative bg-dark border border-secondary rounded-3 shadow-lg mb-4 overflow-hidden d-flex flex-column align-items-center" 
+             style="width: 360px; height: 300px; box-shadow: inset 0 0 50px #000;">
+            
+            <!-- Dark Slot -->
+            <div class="bg-black w-75 h-25 border-bottom border-warning shadow-sm position-relative" style="border-radius: 0 0 10px 10px; z-index: 5;">
+                <div class="position-absolute bottom-0 w-100 text-center text-white-50 small pb-1">DISPENSER TRAY</div>
+            </div>
+
+            <!-- Bills Animation Area -->
+            <div class="flex-grow-1 w-100 position-relative p-3 overflow-hidden">
+                @foreach (var bill in _animationBills)
+                {
+                    <div class="bill-visual animate-bill-drop position-absolute start-50 translate-middle-x" 
+                         style="animation-delay: @(bill.Delay)ms; z-index: @(bill.ZIndex);">
+                        <div class="badge bg-success border border-light text-white shadow d-flex align-items-center justify-content-center" 
+                             style="width: 140px; height: 60px; font-family: 'Courier New', monospace; font-weight: bold; font-size: 1.5rem;">
+                            $@bill.Denomination
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Summary Panel -->
+        <div class="d-flex text-white gap-3 mb-2">
+            @foreach (var kvp in _billCounts)
+            {
+                if (kvp.Value > 0)
+                {
+                     <div class="border border-success rounded p-2 text-center" style="min-width: 60px;">
+                        <div class="text-success fw-bold small">$@kvp.Key</div>
+                        <div class="fs-4 fw-bold">@kvp.Value</div>
+                    </div>
+                }
+            }
+        </div>
+        
+        <div class="text-center mt-2">
+            <div class="text-white-50 small mb-1">TOTAL DISPENSED</div>
+            <div class="fw-bold fs-2 text-white">@Amount.ToString("C2")</div>
+        </div>
+
+    </div>
+
+    <style>
+        .bill-visual {
+            top: -70px; /* Start above the viewing area/inside slot */
+            opacity: 0;
+        }
+
+        @@keyframes billDrop {
+            0% { top: 10px; opacity: 0; transform: translate(-50%, 0) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+            80% { opacity: 1; }
+            100% { top: 200px; opacity: 0; transform: translate(-50%, 20px) rotate(5deg); }
+        }
+
+        .animate-bill-drop {
+            animation: billDrop 0.8s ease-in-out forwards;
+        }
+    </style>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public decimal Amount { get; set; }
+
+    private Dictionary<int, int> _billCounts = new();
+    private List<BillAnimationItem> _animationBills = new();
+
+    protected override void OnParametersSet()
+    {
+        if (IsVisible)
+        {
+            CalculateBills();
+        }
+    }
+
+    private void CalculateBills()
+    {
+        _billCounts.Clear();
+        _animationBills.Clear();
+
+        decimal remaining = Amount;
+        int[] denoms = new[] { 100, 20, 5, 1 };
+
+        foreach (var d in denoms)
+        {
+            int count = (int)(remaining / d);
+            _billCounts[d] = count;
+            remaining -= count * d;
+        }
+
+        // Generate animation items (limit to prevent DOM overload if whale comes in)
+        int delayCounter = 0;
+        int maxBills = 20; // Cap visual bills
+        int totalVisuals = 0;
+
+        foreach (var kvp in _billCounts)
+        {
+            // Add bills to animation list, perhaps interleaved or ordered
+            for (int i = 0; i < kvp.Value; i++)
+            {
+                if (totalVisuals++ > maxBills) break;
+                
+                _animationBills.Add(new BillAnimationItem
+                {
+                    Denomination = kvp.Key,
+                    Delay = delayCounter * 150, // Stagger
+                    ZIndex = 100 - totalVisuals
+                });
+                delayCounter++;
+            }
+        }
+    }
+
+    private class BillAnimationItem
+    {
+        public int Denomination { get; set; }
+        public int Delay { get; set; }
+        public int ZIndex { get; set; }
+    }
+}

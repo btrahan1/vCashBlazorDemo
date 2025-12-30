@@ -1,0 +1,117 @@
+@inject vCashBlazorDemo.Services.GuestService GuestService
+@inject IJSRuntime JS
+@using vCashBlazorDemo.Models
+
+@if (ShowDialog)
+{
+    <div class="modal show" tabindex="-1" style="display: block !important; background-color: rgba(0,0,0,0.5); z-index: 10000;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>Guest Lookup</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Search Bar -->
+                    <div class="input-group mb-3">
+                        <input @ref="SearchInput" type="text" class="form-control" placeholder="Search by Name or DL..." @bind="SearchQuery" @bind:event="oninput" @onkeyup="PerformSearch" />
+                        <button class="btn btn-secondary" @onclick="PerformSearch">Search</button>
+                    </div>
+
+                    <!-- Results Table -->
+                    <div style="height: 300px; overflow-y: auto;">
+                        <table class="table table-hover table-bordered table-striped small">
+                            <thead class="bg-light sticky-top">
+                                <tr>
+                                    <th>Action</th>
+                                    <th>Last Name</th>
+                                    <th>First Name</th>
+                                    <th>DL Number</th>
+                                    <th>City</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (SearchResults == null || !SearchResults.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            @(string.IsNullOrEmpty(SearchQuery) ? "Type to search..." : "No guests found.")
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var guest in SearchResults)
+                                    {
+                                        <tr class="@(guest.IsBanned ? "table-danger" : "")">
+                                            <td class="text-center" style="width: 80px;">
+                                                <button class="btn btn-primary btn-sm" @onclick="() => SelectGuest(guest)">
+                                                    Select
+                                                </button>
+                                            </td>
+                                            <td class="@(guest.IsBanned ? "text-danger fw-bold" : "")">@guest.LastName <span class="badge bg-danger ms-1 @(guest.IsBanned ? "" : "d-none")">BANNED</span></td>
+                                            <td>@guest.FirstName</td>
+                                            <td>@guest.DLNumber</td>
+                                            <td>@guest.City</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public bool ShowDialog { get; set; }
+    
+    [Parameter]
+    public EventCallback<GuestModel> OnGuestSelected { get; set; }
+
+    private string SearchQuery { get; set; } = "";
+    private IEnumerable<GuestModel> SearchResults { get; set; }
+    private ElementReference SearchInput;
+
+    public async Task Show()
+    {
+        await JS.InvokeVoidAsync("console.log", "GuestLookupModal.Show() called. Setting ShowDialog = true.");
+        ShowDialog = true;
+        SearchQuery = "";
+        await PerformSearch();
+        StateHasChanged();
+        
+        // Focus the input
+        try 
+        {
+            await Task.Delay(50); // Give it a moment to render
+            await SearchInput.FocusAsync();
+        }
+        catch { /* ignore focus errors */ }
+    }
+
+    public void Close()
+    {
+        ShowDialog = false;
+        StateHasChanged();
+    }
+
+    private async Task PerformSearch()
+    {
+        SearchResults = await GuestService.SearchAsync(SearchQuery);
+    }
+
+    private async Task SelectGuest(GuestModel guest)
+    {
+        if (OnGuestSelected.HasDelegate)
+        {
+            await OnGuestSelected.InvokeAsync(guest);
+        }
+        Close();
+    }
+}

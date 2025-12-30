@@ -1,0 +1,460 @@
+@using vCashBlazorDemo.Models
+@using vCashBlazorDemo.Services
+@inject GuestService Service
+@inject IJSRuntime JS
+
+@if (ShowDialog)
+{
+    <div class="modal show" tabindex="-1" style="display: block !important; background-color: rgba(0,0,0,0.5); z-index: 10000;">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>@(IsEditMode ? "Edit Guest Details" : "New Guest Registration")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="row g-3">
+                            <!-- LEFT COLUMN: Data Entry -->
+                            <div class="col-md-7">
+                                <div class="card shadow-sm mb-3">
+                                    <div class="card-header bg-white fw-bold">Personal Information</div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <label class="form-label small">First Name</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.FirstName" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small">Middle</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.MiddleName" />
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small">Last Name</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.LastName" />
+                                            </div>
+                                            
+                                            <div class="col-md-6">
+                                                <label class="form-label small">SSN</label>
+                                                <InputText class="form-control form-control-sm" placeholder="***-**-****" @bind-Value="Model.SSN" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small">Date of Birth</label>
+                                                <InputDate class="form-control form-control-sm" @bind-Value="Model.BirthDate" />
+                                            </div>
+                                            
+                                            <div class="col-md-5">
+                                                <label class="form-label small">Driver's License</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.DLNumber" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small">State</label>
+                                                <InputText class="form-control form-control-sm" maxlength="2" @bind-Value="Model.DLState" />
+                                            </div>
+                                           <div class="col-md-4">
+                                                <label class="form-label small">Sex</label>
+                                                <InputSelect class="form-select form-select-sm" @bind-Value="Model.Sex">
+                                                    <option value="M">Male</option>
+                                                    <option value="F">Female</option>
+                                                </InputSelect>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card shadow-sm mb-3">
+                                    <div class="card-header bg-white fw-bold">Contact Details</div>
+                                    <div class="card-body">
+                                         <div class="row g-2">
+                                            <div class="col-12">
+                                                <label class="form-label small">Address</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.Address" />
+                                            </div>
+                                            <div class="col-5">
+                                                <label class="form-label small">City</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.City" />
+                                            </div>
+                                            <div class="col-3">
+                                                <label class="form-label small">State</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.State" />
+                                            </div>
+                                            <div class="col-4">
+                                                <label class="form-label small">Zip</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.Zip" />
+                                            </div>
+                                            <div class="col-6">
+                                                <label class="form-label small">Phone 1</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.Phone1" />
+                                            </div>
+                                             <div class="col-6">
+                                                <label class="form-label small">Phone 2</label>
+                                                <InputText class="form-control form-control-sm" @bind-Value="Model.Phone2" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="card shadow-sm">
+                                    <div class="card-header bg-white fw-bold">System Status</div>
+                                    <div class="card-body">
+                                         <div class="row g-2 align-items-end">
+                                             <div class="col-md-4">
+                                                <label class="form-label small text-danger fw-bold">Account Limit</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <!-- Use type="number" step="0.01" for money -->
+                                                    <input type="number" class="form-control" @bind="Model.AccountLimit" />
+                                                </div>
+                                             </div>
+                                             <div class="col-md-4">
+                                                 <div class="form-check">
+                                                     <InputCheckbox class="form-check-input" @bind-Value="Model.IsBanned" id="chkBan" />
+                                                     <label class="form-check-label text-danger fw-bold" for="chkBan">Blocked / Banned</label>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- RIGHT COLUMN: Biometrics & Photos -->
+                            <div class="col-md-5">
+                                 <!-- Webcam / Photo -->
+                                <div class="card shadow-sm mb-3 h-50">
+                                    <div class="card-header bg-white fw-bold d-flex justify-content-between">
+                                        <span>Guest Photo</span>
+                                        <span class="badge bg-warning text-dark">Webcam Ready</span>
+                                    </div>
+                                    <div class="card-body text-center d-flex flex-column justify-content-center align-items-center bg-dark p-0 overflow-hidden position-relative">
+                                        <!-- Flash Effect Overlay -->
+                                        @if (ShowFlash)
+                                        {
+                                            <div class="position-absolute top-0 start-0 w-100 h-100 bg-white" style="z-index: 50; animation: fade-out 0.2s;"></div>
+                                        }
+
+                                        @if (string.IsNullOrEmpty(Model.PhotoUrl))
+                                        {
+                                            <!-- Video Feed - Hidden until Started? Or always visible if active -->
+                                            <video id="guestWebcam" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; display: @(IsCameraActive ? "block" : "none")"></video>
+                                            
+                                            @if (!IsCameraActive)
+                                            {
+                                                <i class="bi bi-camera-video text-secondary" style="font-size: 4rem;"></i>
+                                                <p class="text-white-50 small mt-2">Camera Off</p>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <!-- Captured Image -->
+                                            <img src="@Model.PhotoUrl" style="width: 100%; height: 100%; object-fit: cover;" />
+                                            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" @onclick="ClearPhoto"><i class="bi bi-x"></i></button>
+                                        }
+                                    </div>
+                                    <div class="card-footer bg-white text-center">
+                                         @if (string.IsNullOrEmpty(Model.PhotoUrl))
+                                         {
+                                             @if (!IsCameraActive)
+                                             {
+                                                 <button type="button" class="btn btn-outline-primary btn-sm me-2" @onclick="StartCamera"><i class="bi bi-camera me-1"></i>Start Camera</button>
+                                             }
+                                             else
+                                             {
+                                                 <button type="button" class="btn btn-primary btn-sm" @onclick="CapturePhoto"><i class="bi bi-person-bounding-box me-1"></i>Capture</button>
+                                                 <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="StopCamera">Stop</button>
+                                             }
+                                         }
+                                         else
+                                         {
+                                              <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearPhoto">Retake</button>
+                                         }
+                                    </div>
+                                </div>
+                                
+                                <!-- ID Card Scan -->
+                                <div class="card shadow-sm h-50">
+                                    <div class="card-header bg-white fw-bold">ID Card Scan</div>
+                                    <div class="card-body text-center d-flex flex-column justify-content-center align-items-center bg-light border p-0 position-relative overflow-hidden">
+                                         @if (string.IsNullOrEmpty(Model.PhotoIdUrl))
+                                         {
+                                             <i class="bi bi-credit-card-2-front text-muted" style="font-size: 3rem;"></i>
+                                             <p class="text-muted small mt-2">No ID Scanned</p>
+                                         }
+                                         else
+                                         {
+                                             <img src="@Model.PhotoIdUrl" class="img-fluid w-100 h-100" style="object-fit: contain;" />
+                                         }
+                                         
+                                         <!-- Flash for ID Scan -->
+                                         @if (ShowIdFlash)
+                                         {
+                                             <div class="position-absolute top-0 start-0 w-100 h-100 bg-white" style="z-index: 50; animation: fade-out 0.2s;"></div>
+                                         }
+                                    </div>
+                                     <div class="card-footer bg-white text-center">
+                                         <button type="button" class="btn btn-outline-dark btn-sm" @onclick="ScanIdCard"><i class="bi bi-upc-scan me-1"></i>Scan ID Card</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Bar -->
+                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                             <button type="button" class="btn btn-secondary px-4" @onclick="Close">Cancel</button>
+                             <button type="submit" class="btn btn-success px-5 fw-bold"><i class="bi bi-save me-2"></i>Save Guest</button>
+                        </div>
+                        <!-- Transaction History Section -->
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="card shadow-sm border-primary">
+                                    <div class="card-header bg-primary text-white py-1 d-flex justify-content-between align-items-center">
+                                         <span class="small fw-bold">Transaction History</span>
+                                         <button type="button" class="btn btn-light btn-sm py-0" style="font-size: 0.7rem;">Export to Excel</button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div style="height: 150px; overflow-y: auto;">
+                                            <table class="table table-sm table-striped table-hover small mb-0 sticky-header">
+                                                <thead class="bg-light sticky-top">
+                                                    <tr>
+                                                        <th>TransDateTime</th>
+                                                        <th>LocationName</th>
+                                                        <th class="text-end">Amount</th>
+                                                        <th class="text-end">Fee</th>
+                                                        <th>CheckNumber</th>
+                                                        <th>CheckType</th>
+                                                        <th>CashierFirstName</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @if (History != null)
+                                                    {
+                                                        @foreach (var item in History)
+                                                        {
+                                                            <tr>
+                                                                <td>@item.TransDateTime.ToString("g")</td>
+                                                                <td>@item.LocationName</td>
+                                                                <td class="text-end">@item.Amount.ToString("C2")</td>
+                                                                <td class="text-end">@item.Fee.ToString("C2")</td>
+                                                                <td>@item.CheckNumber</td>
+                                                                <td>@item.CheckType</td>
+                                                                <td>@item.CashierFirstName</td>
+                                                            </tr>
+                                                        }
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <!-- Footer Totals -->
+                                    <div class="card-footer bg-light py-1 d-flex justify-content-between small fw-bold text-dark">
+                                        <div>
+                                            <span class="me-2">Total Checks Cashed:</span>
+                                            <span class="bg-white border px-2">@(History?.Count() ?? 0)</span>
+                                        </div>
+                                        <div>
+                                            <span class="me-2">Total Checks Returned:</span>
+                                             <span class="bg-white border px-2">@(History?.Count(x => x.IsReturned) ?? 0)</span> <!-- Placeholder filtering -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public bool ShowDialog { get; set; }
+    
+    [Parameter]
+    public EventCallback<GuestModel> OnGuestAdded { get; set; }
+
+    private GuestModel Model { get; set; } = new();
+    private bool IsCameraActive = false;
+    private bool IsEditMode = false;
+    
+    // Transaction History
+    private IEnumerable<vCash.Data.Models.GuestTransactionHistory> History;
+
+    public void Show(GuestModel? existingGuest = null)
+    {
+        History = null; // Reset
+        
+        if (existingGuest != null)
+        {
+            IsEditMode = true;
+            // Clone
+            Model = new GuestModel
+            {
+                GuestId = existingGuest.GuestId,
+                Id = existingGuest.Id,
+                FirstName = existingGuest.FirstName,
+                MiddleName = existingGuest.MiddleName,
+                LastName = existingGuest.LastName,
+                SSN = existingGuest.SSN,
+                BirthDate = existingGuest.BirthDate,
+                DLNumber = existingGuest.DLNumber,
+                DLState = existingGuest.DLState,
+                Sex = existingGuest.Sex,
+                Address = existingGuest.Address,
+                City = existingGuest.City,
+                State = existingGuest.State,
+                Zip = existingGuest.Zip,
+                Phone1 = existingGuest.Phone1,
+                Phone2 = existingGuest.Phone2,
+                AccountLimit = existingGuest.AccountLimit,
+                IsBanned = existingGuest.IsBanned,
+                PhotoUrl = existingGuest.PhotoUrl,
+                PhotoIdUrl = existingGuest.PhotoIdUrl
+            };
+            
+            // Fire and forget history load for UI responsiveness (or await if desired)
+             _ = LoadHistory(Model.GuestId);
+        }
+        else
+        {
+            IsEditMode = false;
+            Model = new GuestModel();
+        }
+
+        ShowDialog = true;
+        IsCameraActive = false;
+        StateHasChanged();
+    }
+    
+    private async Task LoadHistory(int guestId)
+    {
+        History = await Service.GetTransactionHistoryAsync(guestId);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async Task Close()
+    {
+        await StopCamera(); // Ensure camera is off
+        ShowDialog = false;
+        StateHasChanged();
+    }
+
+    // Biometric Logic
+    private async Task StartCamera()
+    {
+        IsCameraActive = true;
+        // Small delay to allow element render if needed
+        await Task.Delay(100); 
+        await JS.InvokeVoidAsync("vCashWebcam.start", "guestWebcam");
+    }
+
+    private bool ShowFlash = false;
+
+    private async Task CapturePhoto()
+    {
+        // 1. Visual Flash Start
+        ShowFlash = true;
+        StateHasChanged();
+        
+        // 2. Capture
+        var dataUrl = await JS.InvokeAsync<string>("vCashWebcam.capture", "guestWebcam");
+        
+        // 3. Process Result
+        if (!string.IsNullOrEmpty(dataUrl))
+        {
+            Model.PhotoUrl = dataUrl;
+            await StopCamera(); 
+        }
+        
+        // 4. Reset Flash after short delay
+        await Task.Delay(150);
+        ShowFlash = false;
+        StateHasChanged();
+    }
+
+    private async Task StopCamera()
+    {
+        if (IsCameraActive)
+        {
+             try
+             {
+                 await JS.InvokeVoidAsync("vCashWebcam.stop", "guestWebcam");
+             }
+             catch
+             {
+                 // Ignore JS errors during cleanup (e.g. element already removed)
+             }
+             IsCameraActive = false;
+        }
+    }
+    
+    private bool ShowIdFlash = false;
+    
+    private async Task ScanIdCard()
+    {
+        // 1. Flash
+        ShowIdFlash = true;
+        StateHasChanged();
+        await Task.Delay(100);
+
+        // 2. Generate
+        var dataUrl = await JS.InvokeAsync<string>("vCashWebcam.generateIdCard", new 
+        {
+            firstName = Model.FirstName,
+            lastName = Model.LastName,
+            address = Model.Address,
+            city = Model.City,
+            state = Model.State,
+            zip = Model.Zip,
+            dob = Model.BirthDate,
+            sex = Model.Sex,
+            dl = Model.DLNumber,
+            photoUrl = Model.PhotoUrl // Pass photo if taken!
+        });
+
+        // 3. Set Result
+        if (!string.IsNullOrEmpty(dataUrl))
+        {
+            Model.PhotoIdUrl = dataUrl;
+        }
+
+        // 4. Reset Flash
+        await Task.Delay(150);
+        ShowIdFlash = false;
+        StateHasChanged();
+    }
+
+    private void ClearPhoto()
+    {
+        Model.PhotoUrl = "";
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        bool success;
+        
+        if (IsEditMode)
+        {
+            success = await Service.UpdateGuestAsync(Model);
+        }
+        else
+        {
+            success = await Service.AddGuestAsync(Model);
+        }
+        
+        if (success)
+        {
+            if (OnGuestAdded.HasDelegate)
+            {
+                await OnGuestAdded.InvokeAsync(Model);
+            }
+            await Close();
+        }
+        else
+        {
+            // Show error (Toast/Alert) - For now, console
+            await JS.InvokeVoidAsync("alert", "Failed to save guest. Check logs.");
+        }
+    }
+}

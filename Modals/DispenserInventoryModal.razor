@@ -1,0 +1,124 @@
+@using vCash.Data.Models
+@using vCashBlazorDemo.Services
+
+@inject vCashBlazorDemo.Services.TransactionService Service
+
+<div class="modal fade @(_isVisible ? "show" : "")" id="inventoryModal" tabindex="-1" style="display: @(_isVisible ? "block" : "none");" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-safe me-2"></i>Dispenser Inventory</h5>
+                <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
+            </div>
+            <div class="modal-body bg-light">
+                @if (IsLoading)
+                {
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Reading Dispenser Status...</p>
+                    </div>
+                }
+                else if (DispenserStatus == null)
+                {
+                    <div class="alert alert-warning">
+                        Unable to connect to dispenser hardware (or Mock DB).
+                    </div>
+                }
+                else
+                {
+                    <div class="row g-3">
+                        <!-- Total Value Card -->
+                        <div class="col-12">
+                            <div class="card bg-success text-white shadow-sm">
+                                <div class="card-body text-center">
+                                    <small class="text-uppercase fw-bold opacity-75">Total Cash Available</small>
+                                    <h2 class="display-4 fw-bold mb-0">@DispenserStatus.TotalInventoryValue.ToString("C0")</h2>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bill Breakdown -->
+                        <div class="col-12">
+                            <div class="card shadow-sm">
+                                <div class="card-header bg-white fw-bold">Bill Breakdown</div>
+                                <div class="card-body p-0">
+                                    <table class="table table-striped mb-0 text-center">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Denom</th>
+                                                <th>Count</th>
+                                                <th class="text-end">Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><span class="badge bg-secondary">$100</span></td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Open100s</td> <!-- Note: Using Opening for simplicity, real logic = Opening + PaidIn - PaidOut -->
+                                                <td class="text-end">@((DispenserStatus.Open100s * 100).ToString("C0"))</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-secondary">$50</span></td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Open50s</td>
+                                                <td class="text-end">@((DispenserStatus.Open50s * 50).ToString("C0"))</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-secondary">$20</span></td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Open20s</td>
+                                                <td class="text-end">@((DispenserStatus.Open20s * 20).ToString("C0"))</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-secondary">$10</span></td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Open10s</td>
+                                                <td class="text-end">@((DispenserStatus.Open10s * 10).ToString("C0"))</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-secondary">$5</span></td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Open5s</td>
+                                                <td class="text-end">@((DispenserStatus.Open5s * 5).ToString("C0"))</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-secondary">$1</span></td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Open1s</td>
+                                                <td class="text-end">@((DispenserStatus.Open1s * 1).ToString("C0"))</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-secondary w-100" @onclick="Close">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _isVisible = false;
+    private bool IsLoading = false;
+    private Dispenser? DispenserStatus;
+
+    public async Task Show()
+    {
+        _isVisible = true;
+        IsLoading = true;
+        StateHasChanged();
+
+        // Simulate read delay
+        await Task.Delay(800);
+        
+        DispenserStatus = await Service.GetDispenserStatusAsync();
+        
+        IsLoading = false;
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+}
