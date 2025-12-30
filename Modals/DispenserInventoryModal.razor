@@ -53,33 +53,33 @@
                                         <tbody>
                                             <tr>
                                                 <td><span class="badge bg-secondary">$100</span></td>
-                                                <td class="fw-bold fs-5">@DispenserStatus.Open100s</td> <!-- Note: Using Opening for simplicity, real logic = Opening + PaidIn - PaidOut -->
-                                                <td class="text-end">@((DispenserStatus.Open100s * 100).ToString("C0"))</td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Current100s</td> <!-- Note: Using Current for consistent math -->
+                                                <td class="text-end">@((DispenserStatus.Current100s * 100).ToString("C0"))</td>
                                             </tr>
                                             <tr>
                                                 <td><span class="badge bg-secondary">$50</span></td>
-                                                <td class="fw-bold fs-5">@DispenserStatus.Open50s</td>
-                                                <td class="text-end">@((DispenserStatus.Open50s * 50).ToString("C0"))</td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Current50s</td>
+                                                <td class="text-end">@((DispenserStatus.Current50s * 50).ToString("C0"))</td>
                                             </tr>
                                             <tr>
                                                 <td><span class="badge bg-secondary">$20</span></td>
-                                                <td class="fw-bold fs-5">@DispenserStatus.Open20s</td>
-                                                <td class="text-end">@((DispenserStatus.Open20s * 20).ToString("C0"))</td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Current20s</td>
+                                                <td class="text-end">@((DispenserStatus.Current20s * 20).ToString("C0"))</td>
                                             </tr>
                                             <tr>
                                                 <td><span class="badge bg-secondary">$10</span></td>
-                                                <td class="fw-bold fs-5">@DispenserStatus.Open10s</td>
-                                                <td class="text-end">@((DispenserStatus.Open10s * 10).ToString("C0"))</td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Current10s</td>
+                                                <td class="text-end">@((DispenserStatus.Current10s * 10).ToString("C0"))</td>
                                             </tr>
                                             <tr>
                                                 <td><span class="badge bg-secondary">$5</span></td>
-                                                <td class="fw-bold fs-5">@DispenserStatus.Open5s</td>
-                                                <td class="text-end">@((DispenserStatus.Open5s * 5).ToString("C0"))</td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Current5s</td>
+                                                <td class="text-end">@((DispenserStatus.Current5s * 5).ToString("C0"))</td>
                                             </tr>
                                             <tr>
                                                 <td><span class="badge bg-secondary">$1</span></td>
-                                                <td class="fw-bold fs-5">@DispenserStatus.Open1s</td>
-                                                <td class="text-end">@((DispenserStatus.Open1s * 1).ToString("C0"))</td>
+                                                <td class="fw-bold fs-5">@DispenserStatus.Current1s</td>
+                                                <td class="text-end">@((DispenserStatus.Current1s * 1).ToString("C0"))</td>
                                             </tr>
                                         </tbody>
                                     </table>
