@@ -24,9 +24,12 @@
                     <div class="alert alert-danger mb-4">
                         <h6 class="fw-bold"><i class="bi bi-shield-exclamation me-2"></i>Risk Indicators:</h6>
                         <ul class="mb-0">
-                            @foreach (var reason in RiskResult.Reason.Split('.', StringSplitOptions.RemoveEmptyEntries))
+                            @foreach (var reason in RiskResult.Reason.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                             {
-                                <li>@reason.Trim()</li>
+                                @if (!string.IsNullOrWhiteSpace(reason))
+                                {
+                                    <li>@reason</li>
+                                }
                             }
                         </ul>
                     </div>
@@ -92,7 +95,7 @@
                                         <div class="col-md-6">
                                             <label class="form-label fw-bold">Enter Corporate Code:</label>
                                             <input type="text" class="form-control form-control-lg text-center fw-bold @(IsCodeValid ? "is-valid" : "")" 
-                                                   placeholder="Wait for Approval..." 
+                                                   placeholder="@(ArePrerequisitesMet ? "Enter code here..." : "Complete Checklist Above First")" 
                                                    @bind="EnteredCode" 
                                                    @bind:event="oninput"
                                                    @onkeyup="ValidateCode"
@@ -102,7 +105,7 @@
                                             </small>
                                             @if (!ArePrerequisitesMet)
                                             {
-                                                <small class="text-danger mt-1 d-block"><i class="bi bi-lock me-1"></i>Verify Maker/Bank first.</small>
+                                                <small class="text-danger mt-1 d-block"><i class="bi bi-lock me-1"></i>Verify Maker/Bank first to unlock.</small>
                                             }
                                         </div>
                                     </div>
