@@ -13,7 +13,7 @@
             
             <!-- Dark Slot -->
             <div class="bg-black w-75 h-25 border-bottom border-warning shadow-sm position-relative" style="border-radius: 0 0 10px 10px; z-index: 5;">
-                <div class="position-absolute bottom-0 w-100 text-center text-white-50 small pb-1">DISPENSER TRAY</div>
+                <div class="position-absolute bottom-0 w-100 text-center text-white-50 small pb-1">RECYCLER TRAY</div>
             </div>
 
             <!-- Bills Animation Area -->
@@ -47,7 +47,26 @@
         
         <div class="text-center mt-2">
             <div class="text-white-50 small mb-1">TOTAL DISPENSED</div>
-            <div class="fw-bold fs-2 text-white">@Amount.ToString("C2")</div>
+            <div class="fw-bold fs-2 text-white">@Math.Abs(Amount).ToString("C2")</div>
+        </div>
+
+        <!-- Proceed Button (Only shown when dispense and processing is done) -->
+        <div class="mt-4" style="min-height: 50px;">
+            @if (_animationComplete && IsProcessed)
+            {
+                <button class="btn btn-success btn-lg px-5 fw-bold shadow animate__animated animate__pulse animate__infinite" 
+                        @onclick="HandleProceed"
+                        style="border: 2px solid #fff; border-radius: 50px;">
+                    <i class="bi bi-check-circle me-2"></i> PROCEED
+                </button>
+            }
+            else if (_animationComplete && !IsProcessed)
+            {
+                <div class="text-warning small animate__animated animate__fadeIn">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    Finalizing Transaction...
+                </div>
+            }
         </div>
 
     </div>
@@ -66,17 +85,21 @@
         }
 
         .animate-bill-drop {
-            animation: billDrop 0.8s ease-in-out forwards;
+            animation: billDrop 1.6s ease-in-out forwards;
         }
     </style>
 }
 
 @code {
     [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public bool IsProcessed { get; set; }
     [Parameter] public decimal Amount { get; set; }
+    [Parameter] public EventCallback OnProceed { get; set; }
 
     private Dictionary<int, int> _billCounts = new();
     private List<BillAnimationItem> _animationBills = new();
+    private bool _animationComplete = false;
+    private int _totalBillsToAnimate = 0;
 
     protected override void OnParametersSet()
     {
@@ -90,8 +113,9 @@
     {
         _billCounts.Clear();
         _animationBills.Clear();
+        _animationComplete = false;
 
-        decimal remaining = Amount;
+        decimal remaining = Math.Abs(Amount);
         int[] denoms = new[] { 100, 20, 5, 1 };
 
         foreach (var d in denoms)
@@ -116,11 +140,40 @@
                 _animationBills.Add(new BillAnimationItem
                 {
                     Denomination = kvp.Key,
-                    Delay = delayCounter * 150, // Stagger
+                    Delay = delayCounter * 300, // Stagger (Slowed down from 150ms)
                     ZIndex = 100 - totalVisuals
                 });
                 delayCounter++;
             }
+        }
+
+        _totalBillsToAnimate = _animationBills.Count;
+        
+        // Start a timer/task to mark animation as complete based on the last bill's end time
+        if (_totalBillsToAnimate > 0)
+        {
+            var lastBillDelay = _animationBills.Last().Delay;
+            var totalDuration = lastBillDelay + 1600; // Delay + Animation Duration
+            _ = MarkAnimationComplete(totalDuration);
+        }
+        else
+        {
+            _animationComplete = true;
+        }
+    }
+
+    private async Task MarkAnimationComplete(int delayMs)
+    {
+        await Task.Delay(delayMs);
+        _animationComplete = true;
+        StateHasChanged();
+    }
+
+    private async Task HandleProceed()
+    {
+        if (OnProceed.HasDelegate)
+        {
+            await OnProceed.InvokeAsync();
         }
     }
 

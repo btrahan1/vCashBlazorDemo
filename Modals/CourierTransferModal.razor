@@ -1,0 +1,99 @@
+@using vCash.Data.Models
+
+<div class="modal fade @(_isVisible ? "show" : "")" id="courierTransferModal" tabindex="-1" style="display: @(_isVisible ? "block" : "none");" role="dialog">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header @(_isLoad ? "bg-primary" : "bg-warning text-dark") text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi @(_isLoad ? "bi-download" : "bi-upload") me-2"></i>
+                    @(_isLoad ? "Courier Cash Load" : "Courier Cash Pickup")
+                </h5>
+                <button type="button" class="btn-close @(_isLoad ? "btn-close-white" : "")" @onclick="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-4">
+                    Enter the number of bills being @(_isLoad ? "loaded into" : "picked up from") the recycler.
+                </p>
+
+                <div class="row g-3">
+                    <!-- Bill Inputs -->
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted uppercase">Hundreds ($100)</label>
+                        <input type="number" class="form-control form-control-lg text-end fw-bold" @bind="Counts.Hundreds" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted uppercase">Fifties ($50)</label>
+                        <input type="number" class="form-control form-control-lg text-end fw-bold" @bind="Counts.Fifties" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted uppercase">Twenties ($20)</label>
+                        <input type="number" class="form-control form-control-lg text-end fw-bold" @bind="Counts.Twenties" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted uppercase">Tens ($10)</label>
+                        <input type="number" class="form-control form-control-lg text-end fw-bold" @bind="Counts.Tens" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted uppercase">Fives ($5)</label>
+                        <input type="number" class="form-control form-control-lg text-end fw-bold" @bind="Counts.Fives" min="0" />
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted uppercase">Ones ($1)</label>
+                        <input type="number" class="form-control form-control-lg text-end fw-bold" @bind="Counts.Ones" min="0" />
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-light rounded d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-secondary">Total Transfer Amount:</span>
+                    <span class="fs-3 fw-bold @(_isLoad ? "text-primary" : "text-warning")">@Counts.Total.ToString("C2")</span>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0">
+                <button type="button" class="btn btn-link text-muted fw-bold text-decoration-none" @onclick="Close">CANCEL</button>
+                <button type="button" class="btn @(_isLoad ? "btn-primary" : "btn-warning") fw-bold px-5 py-2 shadow-sm" @onclick="ConfirmTransfer" disabled="@(Counts.Total <= 0)">
+                    <i class="bi bi-check2-circle me-1"></i> CONFIRM @(_isLoad ? "LOAD" : "PICKUP")
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_isVisible)
+{
+    <div class="modal-backdrop fade show"></div>
+}
+
+<style>
+    .uppercase { text-transform: uppercase; letter-spacing: 0.5px; }
+</style>
+
+@code {
+    private bool _isVisible = false;
+    private bool _isLoad = true;
+    private BillCounts Counts = new BillCounts();
+
+    [Parameter] public EventCallback<(BillCounts Counts, bool IsLoad)> OnTransferConfirmed { get; set; }
+
+    public void Show(bool isLoad)
+    {
+        _isLoad = isLoad;
+        Counts = new BillCounts(); // Reset
+        _isVisible = true;
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmTransfer()
+    {
+        if (Counts.Total > 0)
+        {
+            _isVisible = false;
+            await OnTransferConfirmed.InvokeAsync((Counts, _isLoad));
+        }
+    }
+}

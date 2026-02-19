@@ -118,6 +118,9 @@ namespace vCashBlazorDemo.Services
                 dispenser.PaidOut50s += paidOutCounts.Fifties;
                 dispenser.PaidOut100s += paidOutCounts.Hundreds;
 
+                // Sync Current Inventory
+                dispenser.SyncInventory();
+
                 await _dispenserRepository.UpdateDispenserCountsAsync(dispenser);
             }
             catch (Exception ex)
@@ -230,7 +233,6 @@ namespace vCashBlazorDemo.Services
             try
             {
                 await _repository.SaveTransactionAsync(header, details, checkImages);
-                Clear(); // Reset UI
                 return (true, "Success");
             }
             catch (Exception ex)
@@ -333,12 +335,78 @@ namespace vCashBlazorDemo.Services
             }
         }
 
+        public async Task<(bool Success, string Message)> ProcessCourierTransfer(BillCounts counts, bool isLoad)
+        {
+            try
+            {
+                var dispenser = await _dispenserRepository.GetDispenserAsync(15, DateTime.Today);
+                if (dispenser == null) return (false, "Dispenser not found.");
+
+                if (isLoad)
+                {
+                    dispenser.Load1s += counts.Ones;
+                    dispenser.Load5s += counts.Fives;
+                    dispenser.Load10s += counts.Tens;
+                    dispenser.Load20s += counts.Twenties;
+                    dispenser.Load50s += counts.Fifties;
+                    dispenser.Load100s += counts.Hundreds;
+                }
+                else
+                {
+                    // Pickup (Removing cash)
+                    // Check if enough? Simplification for demo: assumed possible
+                    dispenser.Pickup1s += counts.Ones;
+                    dispenser.Pickup5s += counts.Fives;
+                    dispenser.Pickup10s += counts.Tens;
+                    dispenser.Pickup20s += counts.Twenties;
+                    dispenser.Pickup50s += counts.Fifties;
+                    dispenser.Pickup100s += counts.Hundreds;
+                }
+
+                dispenser.SyncInventory();
+                await _dispenserRepository.UpdateDispenserCountsAsync(dispenser);
+                
+                // Track this in Transaction logs too? Useful for reports.
+                var header = new TransactionHeader
+                {
+                    BusinessDate = DateTime.Today,
+                    LocationId = 15,
+                    GuestId = 0, // System
+                    TransactionHeaderUid = Guid.NewGuid()
+                };
+
+                var details = new List<TransactionDetail> {
+                    new TransactionDetail {
+                        TransDateTime = DateTime.Now,
+                        Amount = isLoad ? counts.Total : -counts.Total,
+                        TransactionTypeId = 99, // Transfer
+                        Comment = isLoad ? "Cash Load" : "Cash Pickup",
+                        TransactionDetailUid = Guid.NewGuid()
+                    }
+                };
+
+                await _repository.SaveTransactionAsync(header, details, new List<TransactionCheckImage>());
+
+                NotifyStateChanged();
+                return (true, "Success");
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
         public void Clear()
         {
             _cart.Clear();
             CurrentGuest = null;
             ActiveTab = "Checks";
             NotifyStateChanged();
+        }
+
+        public async Task<IEnumerable<TransactionDetail>> GetDailyTransactionsAsync(DateTime date)
+        {
+            return await _repository.GetTransactionsByDateAsync(date);
         }
 
         public async Task<vCash.Data.Models.Dispenser?> GetDispenserStatusAsync()

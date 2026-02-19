@@ -7,7 +7,7 @@
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="bi bi-safe me-2"></i>Dispenser Inventory</h5>
+                <h5 class="modal-title"><i class="bi bi-safe me-2"></i>Recycler Inventory</h5>
                 <button type="button" class="btn-close btn-close-white" @onclick="Close"></button>
             </div>
             <div class="modal-body bg-light">
@@ -15,13 +15,13 @@
                 {
                     <div class="text-center py-4">
                         <div class="spinner-border text-primary" role="status"></div>
-                        <p class="mt-2 text-muted">Reading Dispenser Status...</p>
+                        <p class="mt-2 text-muted">Reading Recycler Status...</p>
                     </div>
                 }
                 else if (DispenserStatus == null)
                 {
                     <div class="alert alert-warning">
-                        Unable to connect to dispenser hardware (or Mock DB).
+                        Unable to connect to recycler hardware (or Mock DB).
                     </div>
                 }
                 else

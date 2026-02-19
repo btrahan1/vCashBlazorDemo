@@ -12,5 +12,6 @@ namespace vCash.Data.Repositories
         Task<Maker?> GetMakerAsync(string routingNumber, string accountNumber, int locationId);
         Task<Bank?> GetBankAsync(string routingNumber);
         Task<IEnumerable<Maker>> GetMakersByLocationAsync(int locationId);
+        Task<IEnumerable<TransactionDetail>> GetTransactionsByDateAsync(DateTime date);
     }
 }

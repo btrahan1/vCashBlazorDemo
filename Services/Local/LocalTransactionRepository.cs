@@ -92,5 +92,12 @@ namespace vCashBlazorDemo.Services.Local
             }
             await _localStorage.SetItemAsync(historyKey, history);
         }
+    
+        public async Task<IEnumerable<TransactionDetail>> GetTransactionsByDateAsync(DateTime date)
+        {
+            var all = await LoadHelperAsync();
+            // In our simple mock, we'll filter by the date part of TransDateTime
+            return all.Where(d => d.TransDateTime.Date == date.Date);
+        }
     }
 }
