@@ -50,14 +50,32 @@
                             </div>
                         </div>
 
-                        <div class="d-flex justify-content-between fw-bold fs-5 mt-2 border-top border-dark pt-2">
-                            <span>PAYOUT:</span>
-                            <span>@Math.Abs(NetPayout).ToString("C")</span>
+                        <div class="mt-2 border-top border-dark pt-2">
+                            @if (NetPayout > 0)
+                            {
+                                <div class="d-flex justify-content-between fw-bold fs-5">
+                                    <span>TOTAL DUE:</span>
+                                    <span>@NetPayout.ToString("C")</span>
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span>CASH RECEIVED:</span>
+                                    <span>@TotalCashReceived.ToString("C")</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex justify-content-between fw-bold fs-5">
+                                    <span>PAYOUT:</span>
+                                    <span>@Math.Abs(NetPayout).ToString("C")</span>
+                                </div>
+                            }
                         </div>
 
-                        <!-- Payout Details -->
+                        <!-- Payout / Change Details -->
                         <div class="mt-3 pt-2 border-top border-dashed small">
-                            <div class="fw-bold mb-1 text-uppercase text-decoration-underline">Dispensed Cash</div>
+                            <div class="fw-bold mb-1 text-uppercase text-decoration-underline">
+                                @(NetPayout > 0 ? "Change (Bills)" : "Dispensed Cash")
+                            </div>
                             @if(DispensedBills != null)
                             {
                                 @foreach(var bill in DispensedBills.OrderByDescending(x => x.Key))
@@ -127,6 +145,9 @@
 
     [Parameter]
     public decimal NetPayout { get; set; }
+
+    [Parameter]
+    public decimal TotalCashReceived { get; set; }
 
     [Parameter]
     public Dictionary<int, int> DispensedBills { get; set; } = new();

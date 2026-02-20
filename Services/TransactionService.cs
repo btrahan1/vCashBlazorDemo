@@ -16,6 +16,7 @@ namespace vCashBlazorDemo.Services
         public decimal CashIn { get; set; }
         public decimal CashOut { get; set; }
         public decimal NetCash { get; set; }
+        public decimal CashReceived { get; set; }
     }
 
     public class TransactionService
@@ -63,9 +64,9 @@ namespace vCashBlazorDemo.Services
             };
         }
 
-        public async Task<(bool Success, string Message, BillCounts? ChangeCounts)> ProcessCashTransaction(BillCounts paidInCounts)
+        public async Task<(bool Success, string Message, BillCounts? ChangeCounts, decimal TotalPaidIn)> ProcessCashTransaction(BillCounts paidInCounts)
         {
-            if (!_cart.Any()) return (false, "Cart is empty", null);
+            if (!_cart.Any()) return (false, "Cart is empty", null, 0);
 
             var totals = GetTotals();
             decimal netDue = totals.NetCash; // Positive = Customer Owes, Negative = Customer Receives
@@ -79,7 +80,7 @@ namespace vCashBlazorDemo.Services
                 // Customer Owes Money
                 if (paidInCounts.Total < netDue)
                 {
-                    return (false, $"Insufficient Funds. Due: {netDue:C}, Paid: {paidInCounts.Total:C}", null);
+                    return (false, $"Insufficient Funds. Due: {netDue:C}, Paid: {paidInCounts.Total:C}", null, 0);
                 }
                 changeAmount = paidInCounts.Total - netDue;
             }
@@ -100,7 +101,7 @@ namespace vCashBlazorDemo.Services
                 
                 if (dispenser == null)
                 {
-                     return (false, "Dispenser not found for today.", null);
+                     return (false, "Dispenser not found for today.", null, 0);
                 }
 
                 // Update Counts (Incrementing existing values)
@@ -125,14 +126,14 @@ namespace vCashBlazorDemo.Services
             }
             catch (Exception ex)
             {
-                 return (false, $"Dispenser Update Failed: {ex.Message}", null);
+                 return (false, $"Dispenser Update Failed: {ex.Message}", null, 0);
             }
 
             // 4. Save Transaction Header/Details
             var result = await SubmitTransactionAsync(CurrentGuest?.GuestId ?? 1, 1); // Use CurrentGuest, default to 1 if null (Safety)
-            if (!result.Success) return (false, result.Message, null);
+            if (!result.Success) return (false, result.Message, null, 0);
 
-            return (true, "Success", paidOutCounts);
+            return (true, "Success", paidOutCounts, paidInCounts.Total);
         }
 
         private BillCounts CalculateBillBreakdown(decimal amount)

@@ -484,6 +484,7 @@
               NetPayout="@_receiptTotals.NetCash"
               DispensedBills="@_receiptBills"
               Change="@_receiptChange"
+              TotalCashReceived="@_receiptCashReceived"
               OnClose="HandleReceiptClose" />
 
 <CashPaymentModal @ref="CashPaymentModalRef" OnPaymentConfirmed="HandleCashPayment" />
@@ -600,6 +601,7 @@
     private TransactionTotals _receiptTotals = new TransactionTotals();
     private Dictionary<int, int> _receiptBills = new();
     private decimal _receiptChange = 0;
+    private decimal _receiptCashReceived = 0;
 
     private void CalculatePayoutDetails(decimal totalAmount)
     {
@@ -964,6 +966,7 @@
         {
             // Show Receipt
             _receiptItems = Service.GetCart().ToList(); // Copy
+            _receiptCashReceived = result.TotalPaidIn; // Capture actual cash from recycler
             // Snapshoting totals
             var t = Service.GetTotals();
             _receiptTotals = new TransactionTotals 
