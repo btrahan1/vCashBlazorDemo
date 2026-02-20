@@ -1,0 +1,896 @@
+@page "/score/plus"
+@using vCashBlazorDemo.Models
+@inject vCashBlazorDemo.Services.TransactionService TransactionService
+@inject IJSRuntime JS
+
+<PageTitle>SCORE+ | Modern Check Cashing</PageTitle>
+
+<div class="score-plus-modern">
+    <!-- Top Progress Bar -->
+    <div class="top-nav shadow-sm">
+        <div class="container d-flex justify-content-between align-items-center h-100">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary fs-5 p-2 px-3 fw-bold">SCORE+</span>
+                <span class="text-muted small fw-bold uppercase ms-2">Modern Session</span>
+            </div>
+            <div class="steps-progress d-flex gap-4">
+                <div class="step-link @(CurrentStep == 1 ? "active" : "")">1. IDENTITY</div>
+                <div class="step-link @(CurrentStep == 2 ? "active" : "")">2. CAPTURE</div>
+                <div class="step-link @(CurrentStep == 3 ? "active" : "")">3. VERIFY</div>
+                <div class="step-link @(CurrentStep == 4 ? "active" : "")">4. PAYOUT</div>
+            </div>
+            <button class="btn btn-outline-danger btn-sm" @onclick='() => Nav.NavigateTo("score/transaction")'>Exit Session</button>
+        </div>
+    </div>
+
+    <div class="main-content container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                @if (SelectedGuest != null)
+                {
+                    <div class="guest-session-header animate-fade-in d-flex align-items-center justify-content-between mb-4 p-3 bg-white border rounded-4 shadow-sm border-start-0">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="bg-primary text-white p-2 rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 44px; height: 44px;">
+                                <i class="bi bi-person-check-fill fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="small text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.08rem;">Active Session</div>
+                                <div class="fw-bold text-dark fs-5">@SelectedGuest.FirstName @SelectedGuest.LastName</div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            @if (IsNewGuest)
+                            {
+                                <span class="badge bg-success rounded-pill px-3 py-2 shadow-sm">
+                                    <i class="bi bi-person-plus-fill me-1"></i> NEW GUEST
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm">
+                                    <i class="bi bi-patch-check-fill me-1"></i> ID VERIFIED
+                                </span>
+                            }
+                        </div>
+                    </div>
+                }
+                
+                @if (CurrentStep == 1)
+                {
+                    <!-- STEP 1: IDENTITY -->
+                    <div class="card border-0 shadow-lg animate-fade-in">
+                        <div class="card-body p-5">
+                            <div class="text-center mb-5">
+                                <i class="bi bi-person-bounding-box display-4 text-primary mb-3"></i>
+                                <h2 class="fw-bold">Guest Identification</h2>
+                                <p class="text-muted">High-precision identity verification for frictionless service.</p>
+                            </div>
+
+                            @if (!Scanning && !ShowSearch && !IsCapturingPhoto)
+                            {
+                                <div class="row g-4 mb-5">
+                                    <div class="col-md-6">
+                                        <div class="action-card text-center p-4 border rounded-4 bg-light cursor-pointer h-100 d-flex flex-column justify-content-center" @onclick="StartScan">
+                                            <i class="bi bi-card-heading fs-1 text-primary mb-2 d-block"></i>
+                                            <h5 class="fw-bold">Scan ID Card</h5>
+                                            <p class="small text-muted mb-3">DL, Passport, or State ID</p>
+                                            
+                                            <div class="mt-auto border-top pt-3 w-100" @onclick:stopPropagation="true">
+                                                <div class="form-check form-switch d-flex justify-content-center align-items-center gap-2">
+                                                    <input class="form-check-input custom-switch" type="checkbox" role="switch" id="newGuestSwitch" @bind="IsNewGuest">
+                                                    <label class="form-check-label small fw-bold text-secondary" for="newGuestSwitch">Enroll as New Guest</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="action-card text-center p-4 border rounded-4 bg-light cursor-pointer h-100 d-flex flex-column justify-content-center" @onclick="ToggleSearch">
+                                            <i class="bi bi-search fs-1 text-secondary mb-2 d-block"></i>
+                                            <h5 class="fw-bold">Search Guest</h5>
+                                            <p class="small text-muted mb-0">Name, Phone, or SSN</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else if (ShowSearch)
+                            {
+                                <div class="search-interface animate-fade-in">
+                                    <div class="input-group input-group-lg mb-4 shadow-sm border rounded-pill overflow-hidden">
+                                        <span class="input-group-text bg-white border-0 ps-4"><i class="bi bi-search text-muted"></i></span>
+                                        <input type="text" class="form-control border-0 px-3" placeholder="Enter guest name or phone..." 
+                                               @bind="SearchQuery" @bind:event="oninput" @onkeyup="PerformSearch" autofocus />
+                                        <button class="btn btn-primary px-4" @onclick="ToggleSearch">Cancel</button>
+                                    </div>
+
+                                    <div class="search-results overflow-auto border-top pt-3" style="max-height: 250px;">
+                                        @if (!SearchResults.Any() && !string.IsNullOrEmpty(SearchQuery))
+                                        {
+                                            <div class="text-center py-4 text-muted">No guests found matching "@SearchQuery"</div>
+                                        }
+                                        else if (!SearchResults.Any())
+                                        {
+                                            <div class="text-center py-4 text-muted">Start typing to search the SCORE registry...</div>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var guest in SearchResults)
+                                            {
+                                                <div class="result-item d-flex align-items-center justify-content-between p-3 border-bottom cursor-pointer hover-bg-light rounded-3 mb-2" 
+                                                     @onclick="() => SelectGuest(guest)">
+                                                    <div class="d-flex align-items-center gap-3">
+                                                        <div class="avatar-circle bg-primary bg-opacity-10 text-primary fw-bold">
+                                                            @guest.FirstName[0]@guest.LastName[0]
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-bold text-dark">@guest.FirstName @guest.LastName</div>
+                                                            <div class="text-muted small">DL: @guest.DLNumber • @guest.City, @guest.State</div>
+                                                        </div>
+                                                    </div>
+                                                    <i class="bi bi-chevron-right text-muted"></i>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            else if (IsCapturingPhoto)
+                            {
+                                <div class="webcam-simulation text-center animate-fade-in">
+                                    <div class="webcam-frame mx-auto mb-4 rounded-4 shadow-lg position-relative overflow-hidden bg-dark">
+                                        <div class="webcam-scan-line"></div>
+                                        <div class="webcam-reticle">
+                                            <div class="reticle-corner tl"></div>
+                                            <div class="reticle-corner tr"></div>
+                                            <div class="reticle-corner bl"></div>
+                                            <div class="reticle-corner br"></div>
+                                        </div>
+                                        <i class="bi bi-person-fill display-1 text-white opacity-10"></i>
+                                        @if (IsShutterFired)
+                                        {
+                                            <div class="shutter-flash"></div>
+                                        }
+                                    </div>
+                                    <h4 class="fw-bold animate-pulse">@WebcamStatus</h4>
+                                    <p class="text-muted small">High-precision biometric capture in progress</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                                    @if (IsNewGuest && !Scanning)
+                                    {
+                                        <h5 class="fw-bold mb-1">Registering @PendingGuestName in SCORE Database...</h5>
+                                    }
+                                    else if (!string.IsNullOrEmpty(PendingGuestName))
+                                    {
+                                        <h5 class="fw-bold mb-1">Identifying @PendingGuestName...</h5>
+                                    }
+                                    else
+                                    {
+                                        <h5 class="fw-bold mb-1">Scanning Document...</h5>
+                                    }
+                                    <div class="text-muted small">Extracting bio-data and verifying authenticity</div>
+                                    
+                                    <div class="mt-4 mx-auto" style="max-width: 300px;">
+                                        <div class="progress" style="height: 4px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 75%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (CurrentStep == 2)
+                {
+                    <!-- STEP 2: CAPTURE -->
+                    <div class="card border-0 shadow-lg animate-slide-up">
+                        <div class="card-body p-5">
+                            <div class="text-center mb-5">
+                                <i class="bi bi-file-earmark-check display-4 text-primary mb-3"></i>
+                                <h2 class="fw-bold">Check Capture</h2>
+                                <p class="text-muted">Insert document into the scanner to begin analysis.</p>
+                            </div>
+
+                            @if (!Scanning)
+                            {
+                                <div class="scanner-simulation p-5 bg-light rounded-4 border-dashed text-center">
+                                    <div class="check-feed-slot mb-3"></div>
+                                    <button class="btn btn-primary btn-lg px-5 shadow" @onclick="StartScan">PROCESS DOCUMENT</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="capture-flow">
+                                    <div class="d-flex align-items-center gap-3 mb-4 p-3 bg-light rounded-3">
+                                        <div class="spinner-grow text-success spinner-grow-sm"></div>
+                                        <div class="flex-grow-1 fw-bold">AUTHENTICATING MICR & SIGNATURE...</div>
+                                        <div class="text-success small fw-bold">ACTIVE</div>
+                                    </div>
+
+                                    <!-- Mock Check Visualization -->
+                                    <div class="check-silhouette shadow-sm bg-white border p-4 position-relative overflow-hidden mb-4 rounded-3">
+                                        <div class="scanning-beam-v2"></div>
+                                        <div class="d-flex justify-content-between mb-4 border-bottom pb-2">
+                                            <div class="small fw-bold text-muted uppercase">DOCUMENT AUTHENTICATION</div>
+                                            <div class="small fw-bold text-muted">NO. @(new Random().Next(1000, 9999))</div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-8">
+                                                 <div class="mb-2 bg-light rounded" style="height: 10px; width: 60%;"></div>
+                                                 <div class="mb-4 bg-light rounded" style="height: 10px; width: 80%;"></div>
+                                            </div>
+                                            <div class="col-4 text-end">
+                                                <div class="fs-3 fw-bold text-dark">$1,250.00</div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 font-monospace small opacity-50">
+                                            O: 123456789 A: 987654321 C: 1245
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="text-center mt-5">
+                                         <button class="btn btn-primary px-5 btn-lg shadow" @onclick="NextStep">VIEW VERIFICATION</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (CurrentStep == 3)
+                {
+                    <!-- STEP 3: VERIFY -->
+                    <div class="card border-0 shadow-lg animate-fade-in">
+                        <div class="card-header bg-white border-0 pt-5 text-center">
+                             <h2 class="fw-bold mb-0">Risk Assessment</h2>
+                             <p class="text-muted">Verification summary based on SCORE+ risk registry.</p>
+                        </div>
+                        <div class="card-body p-5">
+                            <div class="row g-4 mb-5">
+                                <div class="col-md-4">
+                                    <div class="p-4 text-center border rounded-4 bg-light">
+                                        <div class="text-muted small uppercase fw-bold mb-1">Risk Level</div>
+                                        <div class="fs-3 fw-bold @(IsNewGuest ? "text-warning" : "text-success")">@(IsNewGuest ? "MEDIUM" : "LOW")</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-4 text-center border rounded-4 bg-light">
+                                        <div class="text-muted small uppercase fw-bold mb-1">Confidence</div>
+                                        <div class="fs-3 fw-bold text-primary">@(IsNewGuest ? "92.4%" : "99.8%")</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="p-4 text-center border rounded-4 bg-light">
+                                        <div class="text-muted small uppercase fw-bold mb-1">Enrollment</div>
+                                        <div class="fs-3 fw-bold text-success">DONE</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="verification-details bg-white border rounded-4 p-4 mb-5">
+                                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                                    <span class="text-muted">Identity Score</span>
+                                    <span class="text-success fw-bold"><i class="bi bi-patch-check-fill me-1"></i> HIGH MATCH</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                                    <span class="text-muted">ID Forensic Check</span>
+                                    <span class="text-success fw-bold"><i class="bi bi-patch-check-fill me-1"></i> PASSED</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-0">
+                                    <span class="text-muted">Sanctions Registry</span>
+                                    <span class="text-success fw-bold"><i class="bi bi-patch-check-fill me-1"></i> CLEAR</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-3">
+                                <button class="btn btn-outline-secondary px-4 lg" @onclick="PrevStep">RE-SCAN</button>
+                                <button class="btn btn-success btn-lg flex-grow-1 shadow fw-bold" @onclick="NextStep">APPROVE & PAYOUT</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else if (CurrentStep == 4)
+                {
+                    <!-- STEP 4: PAYOUT -->
+                    <div class="card border-0 shadow-lg animate-scale-up overflow-hidden">
+                        <div class="card-body p-5 text-center">
+                            
+                            @if (IsDispensing)
+                            {
+                                <div class="payout-simulation animate-fade-in">
+                                    <div class="mb-4">
+                                        <div class="cash-out-slot mx-auto mb-4">
+                                            <div class="bill bill-1"></div>
+                                            <div class="bill bill-2"></div>
+                                            <div class="bill bill-3"></div>
+                                        </div>
+                                    </div>
+                                    <h2 class="fw-bold">Dispensing Cash...</h2>
+                                    <p class="text-muted">High-speed recycler is processing your payout.</p>
+                                    <div class="display-4 fw-bold text-success mb-3">$1,245.00</div>
+                                    
+                                    <div class="mt-4 mx-auto" style="max-width: 400px;">
+                                        <div class="progress rounded-pill shadow-sm" style="height: 10px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                 role="progressbar" style="width: @(DispenseProgress)%;"></div>
+                                        </div>
+                                        <div class="text-muted small mt-2 fw-bold">DISPENSING: @DispenseProgress%</div>
+                                    </div>
+                                </div>
+                            }
+                            else if (IsPrinting)
+                            {
+                                <div class="receipt-simulation animate-fade-in">
+                                    <div class="receipt-container mx-auto mb-4 shadow">
+                                        <div class="receipt-paper animate-receipt-slide">
+                                            <div class="receipt-content p-3 text-start x-small">
+                                                <div class="text-center fw-bold small mb-2">SCORE+ RECEIPT</div>
+                                                <div class="d-flex justify-content-between mb-1"><span>Guest:</span> <span>@SelectedGuest?.LastName</span></div>
+                                                <div class="d-inline-block w-100 border-bottom border-secondary my-2"></div>
+                                                <div class="d-flex justify-content-between fw-bold"><span>PAID:</span> <span>$1,245.00</span></div>
+                                                <div class="text-center mt-3 opacity-50">-----------------</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <h2 class="fw-bold">Printing Receipt...</h2>
+                                    <p class="text-muted">Finalizing documentation for your session.</p>
+                                    
+                                    <div class="mt-4 mx-auto" style="max-width: 400px;">
+                                        <div class="progress rounded-pill shadow-sm" style="height: 10px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                 role="progressbar" style="width: @(PrintProgress)%;"></div>
+                                        </div>
+                                        <div class="text-muted small mt-2 fw-bold">PRINTING: @PrintProgress%</div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="success-screen animate-fade-in">
+                                    <div class="mb-4">
+                                        <i class="bi bi-check-circle-fill display-1 text-success pulse-success"></i>
+                                    </div>
+                                    <h2 class="fw-bold display-5">Transaction Finalized</h2>
+                                    <p class="text-muted mb-5">Funds successfully issued for session.</p>
+
+                                    <div class="p-5 bg-light rounded-4 border mb-5">
+                                        <div class="display-3 fw-bold text-dark">$1,245.00</div>
+                                        <div class="text-muted small fw-bold uppercase">Cash Out (Net)</div>
+                                        <hr class="my-4" />
+                                        <div class="row text-start px-4">
+                                            <div class="col-6 text-muted font-monospace">Check Total</div>
+                                            <div class="col-6 text-end fw-bold font-monospace">$1,250.00</div>
+                                            <div class="col-6 text-muted font-monospace">Service Fee</div>
+                                            <div class="col-6 text-end text-danger fw-bold font-monospace">-$5.00</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-center gap-3">
+                                        <button class="btn btn-primary px-5 py-3 fw-bold shadow animate-bounce-in" @onclick="ResetDemo">START NEW SESSION</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .score-plus-modern {
+        background-color: #f8fafc;
+        min-height: 100vh;
+        width: 100%;
+        color: #334155;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Webcam Styles */
+    .webcam-frame {
+        width: 400px;
+        height: 300px;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .webcam-overlay {
+        position: absolute;
+        inset: 0;
+        border: 20px solid rgba(0,0,0,0.5);
+    }
+    .webcam-reticle {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 160px;
+        height: 220px;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 20px;
+        z-index: 10;
+    }
+    .reticle-corner {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #0d6efd;
+    }
+    .reticle-corner.tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+    .reticle-corner.tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
+    .reticle-corner.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
+    .reticle-corner.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+
+    .webcam-scan-line {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: rgba(13, 110, 253, 0.5);
+        box-shadow: 0 0 15px #0d6efd;
+        z-index: 5;
+        animation: scan-webcam 4s ease-in-out infinite;
+    }
+    @@keyframes scan-webcam {
+        0%, 100% { transform: translateY(50px); opacity: 0; }
+        20%, 80% { opacity: 1; }
+        50% { transform: translateY(250px); }
+    }
+
+    .shutter-flash {
+        position: absolute;
+        inset: 0;
+        background: white;
+        z-index: 100;
+        animation: flash-out 0.3s ease-out forwards;
+    }
+    @@keyframes flash-out { 
+        0% { opacity: 0; }
+        10% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+
+    .animate-pulse {
+        animation: pulse-soft 2s infinite;
+    }
+    @@keyframes pulse-soft {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    /* Payout Animations */
+    .cash-out-slot {
+        width: 250px;
+        height: 20px;
+        background: #1e293b;
+        border-radius: 4px;
+        position: relative;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+    }
+    .bill {
+        position: absolute;
+        top: 2px;
+        left: 25px;
+        width: 200px;
+        height: 80px;
+        background: #dcfce7;
+        border: 1px solid #86efac;
+        border-radius: 4px;
+        z-index: -1;
+        animation: bill-out 1.2s ease-in-out infinite;
+    }
+    .bill-1 { animation-delay: 0s; }
+    .bill-2 { animation-delay: 0.4s; }
+    .bill-3 { animation-delay: 0.8s; }
+
+    @@keyframes bill-out {
+        0% { transform: translateY(-5px); opacity: 0; }
+        20% { opacity: 1; }
+        100% { transform: translateY(60px); opacity: 0; }
+    }
+
+    /* Receipt Animations */
+    .receipt-container {
+        width: 180px;
+        height: 40px;
+        background: #334155;
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+    }
+    .receipt-paper {
+        background: white;
+        width: 160px;
+        margin: 0 auto;
+        border: 1px solid #e2e8f0;
+        position: absolute;
+        top: 2px;
+        left: 10px;
+        z-index: -1;
+    }
+    .animate-receipt-slide {
+        animation: receipt-slide 3s ease-out forwards;
+    }
+    @@keyframes receipt-slide {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(20px); }
+    }
+    .x-small { font-size: 0.65rem; line-height: 1.2; }
+
+    .pulse-success {
+        animation: pulse-ring 2s infinite;
+        border-radius: 50%;
+    }
+    @@keyframes pulse-ring {
+        0% { filter: drop-shadow(0 0 0 rgba(25, 135, 84, 0.4)); }
+        70% { filter: drop-shadow(0 0 15px rgba(25, 135, 84, 0)); }
+        100% { filter: drop-shadow(0 0 0 rgba(25, 135, 84, 0)); }
+    }
+
+    .animate-bounce-in {
+        animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+    @@keyframes bounceIn {
+        from { transform: scale(0.5); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .top-nav {
+        background: white;
+        height: 70px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .step-link {
+        color: #94a3b8;
+        font-weight: 700;
+        font-size: 0.8rem;
+        letter-spacing: 1px;
+        position: relative;
+        padding: 5px 0;
+    }
+    .step-link.active {
+        color: #0f172a;
+    }
+    .step-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: -22px;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #0d6efd;
+        border-radius: 4px 4px 0 0;
+    }
+
+    .guest-session-header {
+        border-left: 4px solid #0d6efd !important;
+    }
+
+    .action-card {
+        transition: all 0.2s ease;
+        border: 2px solid transparent !important;
+    }
+    .action-card:hover {
+        background: white !important;
+        border-color: #0d6efd !important;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    }
+
+    .custom-switch {
+        width: 3rem !important;
+        height: 1.5rem !important;
+        cursor: pointer;
+    }
+    .custom-switch:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+
+    .cursor-pointer { cursor: pointer; }
+
+    .scanner-simulation {
+        border: 2px dashed #cbd5e1;
+    }
+
+    .check-feed-slot {
+        height: 12px;
+        width: 200px;
+        background: #334155;
+        border-radius: 10px;
+        margin: 40px auto;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .check-silhouette {
+        border-radius: 12px;
+        border-bottom: 4px solid #e2e8f0 !important;
+    }
+
+    .scanning-beam-v2 {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, transparent, #0d6efd, transparent);
+        z-index: 5;
+        animation: scan-vertical 2s linear infinite;
+        opacity: 0.7;
+    }
+
+    @@keyframes scan-vertical {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(180px); }
+    }
+
+    .hover-bg-light:hover {
+        background-color: #f1f5f9 !important;
+    }
+
+    .avatar-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .search-results::-webkit-scrollbar {
+        width: 6px;
+    }
+    .search-results::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .search-results::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+
+    .uppercase { text-transform: uppercase; letter-spacing: 1px; }
+
+    .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    .animate-slide-up { animation: slideUp 0.4s ease-out; }
+    .animate-scale-up { animation: scaleUp 0.4s cubic-bezier(0.1, 0.9, 0.2, 1); }
+
+    @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @@keyframes scaleUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+</style>
+
+@code {
+    private int CurrentStep = 1;
+    private bool Scanning = false;
+    private bool ShowSearch = false;
+    private string SearchQuery = "";
+    private IEnumerable<GuestModel> SearchResults = new List<GuestModel>();
+    private GuestModel? SelectedGuest;
+
+    private bool IsNewGuest = false;
+    private bool IsCapturingPhoto = false;
+    private bool IsShutterFired = false;
+    private string PendingGuestName = "";
+    private string WebcamStatus = "Initializing Camera...";
+
+    private bool IsDispensing = false;
+    private int DispenseProgress = 0;
+    private bool IsPrinting = false;
+    private int PrintProgress = 0;
+
+    [Inject] NavigationManager Nav { get; set; } = default!;
+    [Inject] vCashBlazorDemo.Services.GuestService GuestService { get; set; } = default!;
+
+    private async Task StartScan()
+    {
+        if (IsNewGuest && CurrentStep == 1)
+        {
+            await TriggerNewGuestFlow();
+        }
+        else
+        {
+            await TriggerStandardScan();
+        }
+    }
+
+    private async Task TriggerNewGuestFlow()
+    {
+        // 1. Photo Capture Simulation (Enhanced)
+        IsCapturingPhoto = true;
+        WebcamStatus = "Detecting Guest...";
+        StateHasChanged();
+        await Task.Delay(1200); 
+        
+        WebcamStatus = "Aligning Biometrics...";
+        StateHasChanged();
+        await Task.Delay(1500);
+        
+        WebcamStatus = "Optimizing Exposure...";
+        StateHasChanged();
+        await Task.Delay(1000);
+        
+        IsShutterFired = true;
+        StateHasChanged();
+        await Task.Delay(300); // Shutter feel
+        IsShutterFired = false;
+        IsCapturingPhoto = false;
+        WebcamStatus = "Initializing Camera...";
+        
+        // 2. Database Registration Simulation
+        Scanning = true; // reusing 'Scanning' for registration progress bar feel
+        
+        // Pick a realistic random name early so it shows in the UI
+        var commonFirst = new[] { "Michael", "Sarah", "David", "Emma", "Christopher", "Olivia", "James", "Sophia" };
+        var commonLast = new[] { "Anderson", "Rodriguez", "Smith", "Williams", "Johnson", "Brown", "Taylor", "Miller" };
+        var rnd = new Random();
+        PendingGuestName = $"{commonFirst[rnd.Next(commonFirst.Length)]} {commonLast[rnd.Next(commonLast.Length)]}";
+        
+        StateHasChanged();
+        
+        var newGuest = new GuestModel
+        {
+            FirstName = PendingGuestName.Split(' ')[0],
+            LastName = PendingGuestName.Split(' ')[1],
+            DLNumber = "TEMP-" + rnd.Next(1000, 9999),
+            City = "ScorePlus City",
+            State = "SP",
+            BirthDate = DateTime.Today.AddYears(-25)
+        };
+        
+        await GuestService.AddGuestAsync(newGuest);
+        SelectedGuest = newGuest;
+        
+        await Task.Delay(2000); 
+        Scanning = false;
+        PendingGuestName = "";
+        NextStep();
+    }
+
+    private async Task TriggerStandardScan()
+    {
+        Scanning = true;
+        
+        // 1. Identify name immediately so header appears
+        var commonFirst = new[] { "Michael", "Sarah", "David", "Emma", "Christopher", "Olivia", "James", "Sophia" };
+        var commonLast = new[] { "Anderson", "Rodriguez", "Smith", "Williams", "Johnson", "Brown", "Taylor", "Miller" };
+        var rnd = new Random();
+        PendingGuestName = $"{commonFirst[rnd.Next(commonFirst.Length)]} {commonLast[rnd.Next(commonLast.Length)]}";
+        
+        // Attempt to find an existing match or synthesize a mock to ensure UI works
+        if (SelectedGuest == null)
+        {
+            var guests = await GuestService.SearchAsync("");
+            var mock = guests.FirstOrDefault();
+            if (mock != null)
+            {
+                SelectedGuest = mock;
+            }
+            else
+            {
+                // Synthesize for demo consistency if DB is empty
+                SelectedGuest = new GuestModel
+                {
+                    FirstName = PendingGuestName.Split(' ')[0],
+                    LastName = PendingGuestName.Split(' ')[1],
+                    DLNumber = "DL-" + rnd.Next(1000, 9999),
+                    City = "Return City",
+                    State = "ST",
+                    BirthDate = DateTime.Today.AddYears(-30)
+                };
+            }
+        }
+
+        IsNewGuest = false; // Ensure we show the "ID VERIFIED" badge
+        StateHasChanged(); // Show header now!
+        
+        // 2. Identification simulation delay
+        await Task.Delay(2000);
+        
+        Scanning = false;
+        PendingGuestName = ""; // Clear for next phase
+        NextStep();
+    }
+
+    private async Task ToggleSearch()
+    {
+        ShowSearch = !ShowSearch;
+        SearchQuery = "";
+        SearchResults = new List<GuestModel>();
+        StateHasChanged();
+    }
+
+    private async Task PerformSearch()
+    {
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            SearchResults = new List<GuestModel>();
+        }
+        else
+        {
+            SearchResults = await GuestService.SearchAsync(SearchQuery);
+        }
+        StateHasChanged();
+    }
+
+    private void SelectGuest(GuestModel guest)
+    {
+        SelectedGuest = guest;
+        ShowSearch = false;
+        IsNewGuest = false; // Override if they were doing a search
+        NextStep();
+    }
+
+    private async Task NextStep()
+    {
+        CurrentStep++;
+        
+        // If moving to Payout step (Step 4), trigger simulations
+        if (CurrentStep == 4)
+        {
+            await TriggerPayoutSimulation();
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task TriggerPayoutSimulation()
+    {
+        IsDispensing = true;
+        DispenseProgress = 0;
+        StateHasChanged();
+
+        for (int i = 0; i <= 100; i += 5)
+        {
+            DispenseProgress = i;
+            StateHasChanged();
+            await Task.Delay(100); // 2s total for 100%
+        }
+        
+        await Task.Delay(500); // Short pause between phases
+        IsDispensing = false;
+        IsPrinting = true;
+        PrintProgress = 0;
+        StateHasChanged();
+
+        for (int i = 0; i <= 100; i += 4)
+        {
+            PrintProgress = i;
+            StateHasChanged();
+            await Task.Delay(80); // ~2s total for 100%
+        }
+        
+        await Task.Delay(500);
+        IsPrinting = false;
+        StateHasChanged();
+    }
+
+    private void PrevStep()
+    {
+        if (CurrentStep > 1) CurrentStep--;
+        StateHasChanged();
+    }
+
+    private void ResetDemo()
+    {
+        CurrentStep = 1;
+        Scanning = false;
+        ShowSearch = false;
+        SearchQuery = "";
+        SelectedGuest = null;
+        IsDispensing = false;
+        IsPrinting = false;
+        IsNewGuest = false;
+        IsCapturingPhoto = false;
+        IsShutterFired = false;
+        PendingGuestName = "";
+        StateHasChanged();
+    }
+}
