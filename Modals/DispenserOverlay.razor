@@ -5,7 +5,14 @@
     <div class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center" 
          style="background-color: rgba(0,0,0,0.9); z-index: 20000; color: #fff; backdrop-filter: blur(5px);">
         
-        <h2 class="fw-bold mb-4 text-uppercase text-success" style="letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,0,0.5);">DISPENSING CASH</h2>
+        @if (IsChange)
+        {
+            <h2 class="fw-bold mb-4 text-uppercase text-info" style="letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,255,0.5);">DISPENSING CHANGE</h2>
+        }
+        else
+        {
+            <h2 class="fw-bold mb-4 text-uppercase text-success" style="letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,0,0.5);">DISPENSING PAYOUT</h2>
+        }
         
         <!-- Dispenser Machine Visual -->
         <div class="position-relative bg-dark border border-secondary rounded-3 shadow-lg mb-4 overflow-hidden d-flex flex-column align-items-center" 
@@ -94,6 +101,7 @@
     [Parameter] public bool IsVisible { get; set; }
     [Parameter] public bool IsProcessed { get; set; }
     [Parameter] public decimal Amount { get; set; }
+    [Parameter] public bool IsChange { get; set; }
     [Parameter] public EventCallback OnProceed { get; set; }
 
     private Dictionary<int, int> _billCounts = new();

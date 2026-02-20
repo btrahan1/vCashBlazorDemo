@@ -16,7 +16,11 @@
 <PageTitle>SCORE POS</PageTitle>
 
 <div class="container-fluid vcash-layout h-100">
-    <DispenserOverlay IsVisible="@IsProcessing" IsProcessed="@IsTransactionSuccess" Amount="@NetCash" OnProceed="HandleDispenseProceed" />
+    <DispenserOverlay IsVisible="@IsProcessing" 
+                      IsProcessed="@IsTransactionSuccess" 
+                      Amount="@_dispenseAmount" 
+                      IsChange="@(Service.GetTotals().NetCash > 0)"
+                      OnProceed="HandleDispenseProceed" />
 
     <div class="row h-100">
         <!-- LEFT COLUMN -->
@@ -602,6 +606,7 @@
     private Dictionary<int, int> _receiptBills = new();
     private decimal _receiptChange = 0;
     private decimal _receiptCashReceived = 0;
+    private decimal _dispenseAmount = 0;
 
     private void CalculatePayoutDetails(decimal totalAmount)
     {
@@ -951,6 +956,12 @@
 
     private async Task CompleteCheckout(vCash.Data.Models.BillCounts paidIn)
     {
+        // Reset simulation state to prevent ghosting from previous transaction
+        _dispenseAmount = 0;
+        _receiptCashReceived = 0;
+        _receiptChange = 0;
+        _receiptBills.Clear();
+
         IsProcessing = true;
         StateHasChanged();
 
@@ -967,8 +978,18 @@
             // Show Receipt
             _receiptItems = Service.GetCart().ToList(); // Copy
             _receiptCashReceived = result.TotalPaidIn; // Capture actual cash from recycler
-            // Snapshoting totals
+            
             var t = Service.GetTotals();
+
+            // Calculate Dispense Amount and Change
+            _dispenseAmount = result.TotalPaidIn - t.NetCash;
+            _receiptChange = _dispenseAmount; // Default to full amount
+            if (result.ChangeCounts != null)
+            {
+                _receiptChange = _dispenseAmount - result.ChangeCounts.Total;
+            }
+
+            // Snapshoting totals
             _receiptTotals = new TransactionTotals 
             { 
                 TotalFees = t.TotalFees, 
@@ -1011,6 +1032,15 @@
         ClearCheckInputs();
         ClearMoneyOrderInput();
         ClearWireInput();
+        
+        // Reset receipt state
+        _receiptItems = new List<TransactionModel>();
+        _receiptTotals = new TransactionTotals();
+        _receiptBills.Clear();
+        _receiptChange = 0;
+        _receiptCashReceived = 0;
+        _dispenseAmount = 0;
+
         DetectedMakerName = "Scan Check or Enter Routing #";
         StateHasChanged();
     }

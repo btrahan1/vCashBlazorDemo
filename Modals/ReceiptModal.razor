@@ -76,7 +76,15 @@
                             <div class="fw-bold mb-1 text-uppercase text-decoration-underline">
                                 @(NetPayout > 0 ? "Change (Bills)" : "Dispensed Cash")
                             </div>
-                            @if(DispensedBills != null)
+                            @if (NetPayout > 0 && TotalCashReceived > NetPayout)
+                            {
+                                <div class="d-flex justify-content-between fw-bold text-dark border-bottom pb-1 mb-2">
+                                    <span>TOTAL CHANGE:</span>
+                                    <span>@((TotalCashReceived - NetPayout).ToString("N2"))</span>
+                                </div>
+                            }
+
+                            @if(DispensedBills != null && DispensedBills.Any(b => b.Value > 0))
                             {
                                 @foreach(var bill in DispensedBills.OrderByDescending(x => x.Key))
                                 {
@@ -91,7 +99,7 @@
                             }
                         </div>
                         
-                        @if(Change > 0)
+                        @if(Change > 0.005m)
                         {
                             <div class="mt-2 pt-2 border-top border-dark border-dashed small">
                                 <div class="fw-bold mb-1 text-uppercase text-decoration-underline">Change (Coins)</div>
@@ -112,6 +120,10 @@
                         <div class="position-absolute start-0 w-100" style="bottom: -10px; height: 10px; background: radial-gradient(circle, transparent 70%, #fff 75%) 0 0/10px 10px repeat-x;"></div>
                     </div>
 
+                </div>
+
+                @if (!IsPrinting)
+                {
                     <!-- Actions -->
                     <div class="bg-light p-2 d-flex gap-2">
                         <button class="btn btn-primary w-100" @onclick="Print">
@@ -121,12 +133,65 @@
                             Close
                         </button>
                     </div>
+                }
 
-                </div>
+                <!-- Printing Simulation Overlay -->
+                @if (IsPrinting)
+                {
+                    <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center px-4 text-center animate-fade-in" 
+                         style="background-color: rgba(255,255,255,0.95); z-index: 100; backdrop-filter: blur(4px);">
+                        
+                        @if (PrintProgress < 100)
+                        {
+                            <div class="mb-4">
+                                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <h5 class="fw-bold text-dark mb-2">Printing Receipt</h5>
+                            <p class="text-muted small mb-4">@PrintStatus</p>
+                            
+                            <div class="progress w-100" style="height: 6px; border-radius: 3px; background-color: #e9ecef;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+                                     role="progressbar" 
+                                     style="width: @(PrintProgress)%"></div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="animate-bounce-in mb-3">
+                                <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center shadow-lg" 
+                                     style="width: 64px; height: 64px;">
+                                    <i class="bi bi-check-lg fs-1"></i>
+                                </div>
+                            </div>
+                            <h5 class="fw-bold text-success mb-1">Print Complete!</h5>
+                            <p class="text-muted small">Please collect your receipt from the printer tray.</p>
+                        }
+                    </div>
+                }
             </div>
         </div>
     </div>
 }
+
+<style>
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .animate-bounce-in {
+        animation: bounceIn 0.5s cubic-bezier(0.36, 0, 0.66, -0.56) 0s 1 normal forwards;
+    }
+    @@keyframes bounceIn {
+        0% { transform: scale(0.1); opacity: 0; }
+        60% { transform: scale(1.2); opacity: 1; }
+        100% { transform: scale(1); }
+    }
+</style>
 
 @code {
     public bool ShowDialog { get; set; }
@@ -158,8 +223,14 @@
     [Parameter]
     public EventCallback OnClose { get; set; }
 
+    private bool IsPrinting = false;
+    private int PrintProgress = 0;
+    private string PrintStatus = "Initializing Printer...";
+
     public void Show()
     {
+        IsPrinting = false;
+        PrintProgress = 0;
         ShowDialog = true;
         StateHasChanged();
     }
@@ -167,6 +238,7 @@
     public async Task Close()
     {
         ShowDialog = false;
+        IsPrinting = false;
         if (OnClose.HasDelegate)
         {
             await OnClose.InvokeAsync();
@@ -176,8 +248,31 @@
 
     private async Task Print()
     {
-        // Mock Print
-        await JS.InvokeVoidAsync("alert", "Printing Receipt to Local Printer...");
+        IsPrinting = true;
+        PrintProgress = 0;
+        
+        // Phase 1: Connection
+        PrintStatus = "Connecting to Star Printer...";
+        StateHasChanged();
+        await Task.Delay(800);
+        PrintProgress = 30;
+        
+        // Phase 2: Encoding
+        PrintStatus = "Encoding Transaction Data...";
+        StateHasChanged();
+        await Task.Delay(1200);
+        PrintProgress = 70;
+        
+        // Phase 3: Finalizing
+        PrintStatus = "Finalizing Print Job...";
+        StateHasChanged();
+        await Task.Delay(1000);
+        PrintProgress = 100;
+        StateHasChanged();
+        
+        // Wait for user to see the success checkmark
+        await Task.Delay(1500);
+        
         await Close();
     }
 }
